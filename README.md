@@ -70,10 +70,14 @@ CONTEXT.md
 
 ## Install notes (product)
 
-- **CLI-only:** ship/install `asv` without the GUI.
-- **DMG:** app + top-level `asv` + CLI also inside the app bundle (ADR 0006).
+- **Installer (recommended):** double-click the `.pkg` (from the DMG or standalone). It installs:
+  - **Agent Session Viewer.app** → `/Applications`
+  - **`asv`** → `/usr/local/bin/asv`  
+  No manual drag-and-drop or copy is required (admin password once).
+- **CLI-only:** you can still place `asv` on PATH without the GUI if you extract it from a build.
+- Fallback: `asv` is also inside the app at `Contents/Resources/bin/asv` (ADR 0006).
 
-### Build a DMG
+### Build installer + DMG
 
 ```bash
 ./scripts/package-dmg.sh
@@ -82,8 +86,11 @@ CONTEXT.md
 
 Outputs:
 
-- `dist/AgentSessionViewer-<version>.dmg`
-- `dist/AgentSessionViewer.dmg` (same file, stable name)
-- Staged app: `dist/stage/Agent Session Viewer.app`
+| Artifact | Path |
+|----------|------|
+| Installer package | `dist/AgentSessionViewer-<version>.pkg` |
+| Stable pkg name | `dist/AgentSessionViewer.pkg` |
+| DMG (contains the installer) | `dist/AgentSessionViewer-<version>.dmg` |
+| Staged app | `dist/stage/Agent Session Viewer.app` |
 
-DMG contents: drag **Agent Session Viewer.app** → Applications, copy **asv** to PATH (or run the install script inside the app).
+**User flow:** open the DMG → double-click **Install Agent Session Viewer.pkg** → authenticate → open the app from Applications and run `asv --help` in Terminal.

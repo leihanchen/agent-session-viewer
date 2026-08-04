@@ -165,11 +165,11 @@
 |----|-------------|
 | I1 | **Non-sandboxed** local macOS app (ADR 0004). Not App Store for v1. |
 | I2 | **CLI-only install:** users can install `asv` **without** the GUI (documented release artifact and/or package manager formula later). |
-| I3 | **DMG (app distribution):** ships the **Agent Session Viewer** `.app` and **includes `asv`** so users who install via DMG can get the CLI without a second download. Acceptable patterns (pick one during packaging): |
-| | — `asv` binary inside the app bundle (e.g. `Contents/MacOS/asv` or `Contents/Resources/bin/asv`) **and** a documented way to put it on PATH (symlink script, “Install CLI” menu item, or post-install note); or |
-| | — DMG contains both `Agent Session Viewer.app` and a top-level `asv` binary (or installer pkg) side by side. |
+| I3 | **Installer package (primary):** a macOS `.pkg` (also wrapped in a DMG) installs **Agent Session Viewer.app** to `/Applications` and **`asv`** to `/usr/local/bin` with a single Installer run (admin password). Users must **not** need to drag-copy the app or CLI. |
+| I3b | **DMG:** contains the installer `.pkg` and a short README; double-click the pkg to install. |
+| I3c | **Fallback:** `asv` may also live at `Agent Session Viewer.app/Contents/Resources/bin/asv` for recovery if PATH install is removed. |
 | I4 | GUI and CLI from the same version must produce compatible Export bundles (`schema_version` + `agent`). |
-| I5 | README documents: open app, override Data root, install CLI standalone, install CLI from DMG bundle. |
+| I5 | README documents: run installer, open app, override Data root, CLI-only options, uninstall paths. |
 
 ---
 
@@ -241,7 +241,7 @@ agent-session-viewer/
 | **P0** | Core + `asv` list/projects/sessions + app shell + fixtures | Done |
 | **P1** | Detail stream: UI Conversation + `asv show` prints all messages; Readable / Full trace | Done |
 | **P2** | Export CLI + core export API (app export button optional polish) | Mostly done (CLI export) |
-| **P3** | DMG packaging with bundled `asv` + CLI-only install | Done (`scripts/package-dmg.sh`) |
+| **P3** | PKG installer → `/Applications` + `/usr/local/bin`; DMG wraps the pkg | Done (`scripts/package-dmg.sh`) |
 | **Later** | Full-text search; live refresh; second Agent adapter; zip export; nested subagents; in-app export UI | |
 
 ---
@@ -252,7 +252,7 @@ agent-session-viewer/
 2. Selecting a Session shows Session info and Events; Full trace reveals tool payloads.
 3. `asv export --all --out /tmp/asv-out` writes one JSON file per Session with `schema_version` and `agent: "grok-build"`.
 4. `asv` runs when installed without the GUI.
-5. DMG (or documented app distribution) includes a way to get the same `asv` binary.
+5. Installer package places the app in `/Applications` and `asv` in `/usr/local/bin` without manual copy; DMG carries that installer.
 6. No code path deletes or rewrites files under Grok home.
 7. UI strings are English; product name is Agent Session Viewer; CLI is `asv`.
 

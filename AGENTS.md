@@ -131,9 +131,13 @@ Three columns (CC LOG–style, English):
 | **P0** | Core + `asv` + app shell + fixtures — **done** |
 | **P1** | Detail stream UI + `asv show` conversation — **done** |
 | **P2** | In-app export UI polish |
-| **P3** | DMG packaging — `./scripts/package-dmg.sh` — **done** |
+| **P3** | Installer PKG + DMG — `./scripts/package-dmg.sh` — app → `/Applications`, `asv` → `/usr/local/bin` |
 
-Install product rules: CLI installable **standalone**; DMG may **bundle** `asv` (ADR 0006).
+Install product rules (ADR 0006):
+
+- **PKG installer** (also inside the DMG) installs app + CLI with admin auth — no manual copy.
+- CLI remains installable **standalone** if needed.
+- Fallback: `asv` inside the app bundle under `Contents/Resources/bin/`.
 
 ---
 

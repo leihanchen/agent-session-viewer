@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
-# Build release binaries, assemble .app + asv, and produce a DMG.
+# Build release binaries, .app, macOS Installer (.pkg), and a DMG that carries the installer.
+#
+# The .pkg installs:
+#   - Agent Session Viewer.app  → /Applications
+#   - asv                       → /usr/local/bin/asv
+#
+# User flow: open DMG → double-click Install Agent Session Viewer.pkg → enter password → done.
+# No manual drag-copy required.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -9,15 +16,23 @@ APP_NAME="Agent Session Viewer"
 BIN_NAME="AgentSessionViewer"
 CLI_NAME="asv"
 BUNDLE_ID="app.agentsessionviewer.app"
+PKG_ID="app.agentsessionviewer.pkg"
 VERSION="${ASV_VERSION:-0.1.0}"
 MIN_MACOS="14.0"
 
 DIST="$ROOT/dist"
 STAGE="$DIST/stage"
+PKG_ROOT="$DIST/pkg-root"
+PKG_SCRIPTS="$DIST/pkg-scripts"
 DMG_ROOT="$DIST/dmg-root"
 APP_BUNDLE="$STAGE/${APP_NAME}.app"
+COMPONENT_PKG="$DIST/AgentSessionViewer-component.pkg"
+PRODUCT_PKG="$DIST/AgentSessionViewer-${VERSION}.pkg"
+STABLE_PKG="$DIST/AgentSessionViewer.pkg"
 DMG_PATH="$DIST/AgentSessionViewer-${VERSION}.dmg"
+STABLE_DMG="$DIST/AgentSessionViewer.dmg"
 VOL_NAME="Agent Session Viewer"
+INSTALLER_NAME="Install Agent Session Viewer.pkg"
 
 echo "==> Building release products…"
 swift build -c release --product AgentSessionViewer
@@ -29,7 +44,7 @@ test -x "$APP_BIN"
 test -x "$CLI_BIN"
 
 echo "==> Assembling app bundle…"
-rm -rf "$STAGE" "$DMG_ROOT"
+rm -rf "$STAGE" "$PKG_ROOT" "$PKG_SCRIPTS" "$DMG_ROOT"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources/bin"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
@@ -37,30 +52,16 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
 cp "$APP_BIN" "$APP_BUNDLE/Contents/MacOS/${BIN_NAME}"
 chmod +x "$APP_BUNDLE/Contents/MacOS/${BIN_NAME}"
 
-# Bundle CLI inside the app (ADR 0006) and also ship a top-level copy on the DMG.
+# Keep a copy of the CLI inside the app (fallback / discoverability; primary install is via pkg).
 cp "$CLI_BIN" "$APP_BUNDLE/Contents/Resources/bin/${CLI_NAME}"
 chmod +x "$APP_BUNDLE/Contents/Resources/bin/${CLI_NAME}"
 
-# Helper: install CLI to /usr/local/bin (optional, run by user)
-cat > "$APP_BUNDLE/Contents/Resources/bin/install-asv.sh" << 'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-SRC="$(cd "$(dirname "$0")" && pwd)/asv"
-DEST_DIR="${1:-/usr/local/bin}"
-DEST="${DEST_DIR}/asv"
-if [[ ! -x "$SRC" ]]; then
-  echo "asv binary not found next to this script: $SRC" >&2
-  exit 1
+# Optional app icon
+if [[ -f "$ROOT/Assets/asv-icon-1024.png" ]]; then
+  # PNG as resource; full .icns can be added later for Dock polish.
+  cp "$ROOT/Assets/asv-icon-1024.png" "$APP_BUNDLE/Contents/Resources/AppIcon.png"
 fi
-mkdir -p "$DEST_DIR"
-cp "$SRC" "$DEST"
-chmod +x "$DEST"
-echo "Installed: $DEST"
-"$DEST" --version || true
-EOF
-chmod +x "$APP_BUNDLE/Contents/Resources/bin/install-asv.sh"
 
-# Info.plist
 cat > "$APP_BUNDLE/Contents/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -100,67 +101,163 @@ cat > "$APP_BUNDLE/Contents/Info.plist" << EOF
 </plist>
 EOF
 
-# PkgInfo
 echo -n "APPL????" > "$APP_BUNDLE/Contents/PkgInfo"
 
-# Install notes inside the app (Helpful for first run)
 cat > "$APP_BUNDLE/Contents/Resources/INSTALL-CLI.txt" << EOF
 Agent Session Viewer — CLI (${CLI_NAME})
 
-The ${CLI_NAME} binary is bundled at:
+When you use the official installer package, ${CLI_NAME} is already at:
+
+  /usr/local/bin/${CLI_NAME}
+
+This in-app copy is a fallback:
 
   ${APP_NAME}.app/Contents/Resources/bin/${CLI_NAME}
-
-Install onto your PATH (example):
-
-  "${APP_NAME}.app/Contents/Resources/bin/install-asv.sh"
-  # or:
-  cp "${APP_NAME}.app/Contents/Resources/bin/${CLI_NAME}" /usr/local/bin/${CLI_NAME}
-
-CLI-only: the DMG also includes a top-level ${CLI_NAME} binary you can copy
-without installing the app.
-
-  ${CLI_NAME} --help
 EOF
 
-echo "==> Ad-hoc codesign…"
-# Unsigned / ad-hoc is fine for local distribution; Gatekeeper may still warn.
+echo "==> Ad-hoc codesign (app + CLI)…"
 codesign --force --deep --sign - "$APP_BUNDLE" 2>/dev/null || true
 codesign --force --sign - "$APP_BUNDLE/Contents/Resources/bin/${CLI_NAME}" 2>/dev/null || true
+codesign --force --sign - "$CLI_BIN" 2>/dev/null || true
 
-echo "==> Preparing DMG root…"
+echo "==> Staging installer payload…"
+# Install locations (relative to /):
+#   Applications/Agent Session Viewer.app
+#   usr/local/bin/asv
+mkdir -p "$PKG_ROOT/Applications"
+mkdir -p "$PKG_ROOT/usr/local/bin"
+cp -R "$APP_BUNDLE" "$PKG_ROOT/Applications/"
+cp "$CLI_BIN" "$PKG_ROOT/usr/local/bin/${CLI_NAME}"
+chmod 755 "$PKG_ROOT/usr/local/bin/${CLI_NAME}"
+
+# Ensure /usr/local/bin exists even on fresh machines; refresh Launch Services for the app.
+mkdir -p "$PKG_SCRIPTS"
+cat > "$PKG_SCRIPTS/preinstall" << 'EOF'
+#!/bin/bash
+set -euo pipefail
+mkdir -p /usr/local/bin
+exit 0
+EOF
+cat > "$PKG_SCRIPTS/postinstall" << 'EOF'
+#!/bin/bash
+set -euo pipefail
+# Make the app visible to Launch Services / Spotlight sooner.
+if [[ -d "/Applications/Agent Session Viewer.app" ]]; then
+  /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+    -f "/Applications/Agent Session Viewer.app" 2>/dev/null || true
+fi
+# Ensure CLI is executable
+if [[ -f /usr/local/bin/asv ]]; then
+  chmod 755 /usr/local/bin/asv
+fi
+exit 0
+EOF
+chmod 755 "$PKG_SCRIPTS/preinstall" "$PKG_SCRIPTS/postinstall"
+
+echo "==> Building component package…"
+rm -f "$COMPONENT_PKG" "$PRODUCT_PKG" "$STABLE_PKG"
+pkgbuild \
+  --root "$PKG_ROOT" \
+  --scripts "$PKG_SCRIPTS" \
+  --identifier "$PKG_ID" \
+  --version "$VERSION" \
+  --install-location / \
+  --ownership recommended \
+  "$COMPONENT_PKG"
+
+# Distribution-style product package (nicer Installer.app title).
+DIST_XML="$DIST/distribution.xml"
+cat > "$DIST_XML" << EOF
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>Agent Session Viewer</title>
+    <organization>app.agentsessionviewer</organization>
+    <domains enable_localSystem="true"/>
+    <options customize="never" require-scripts="true" rootVolumeOnly="true"/>
+    <welcome file="welcome.html" mime-type="text/html"/>
+    <conclusion file="conclusion.html" mime-type="text/html"/>
+    <pkg-ref id="${PKG_ID}"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="${PKG_ID}"/>
+        </line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="${PKG_ID}" visible="false">
+        <pkg-ref id="${PKG_ID}"/>
+    </choice>
+    <pkg-ref id="${PKG_ID}" version="${VERSION}" onConclusion="none">${COMPONENT_PKG##*/}</pkg-ref>
+</installer-gui-script>
+EOF
+
+# productbuild needs resources relative to --resources and packages in cwd or absolute
+RESOURCES="$DIST/pkg-resources"
+mkdir -p "$RESOURCES"
+cat > "$RESOURCES/welcome.html" << EOF
+<!DOCTYPE html>
+<html><body style="font-family: -apple-system, sans-serif; font-size: 13px; color: #222;">
+<h2>Agent Session Viewer ${VERSION}</h2>
+<p>This installer will place:</p>
+<ul>
+  <li><b>Agent Session Viewer.app</b> in <code>/Applications</code></li>
+  <li><b>asv</b> CLI in <code>/usr/local/bin</code> (on your PATH)</li>
+</ul>
+<p>You will be asked for an administrator password. No manual copying is required.</p>
+<p>Requires macOS ${MIN_MACOS}+ (Apple Silicon).</p>
+</body></html>
+EOF
+cat > "$RESOURCES/conclusion.html" << EOF
+<!DOCTYPE html>
+<html><body style="font-family: -apple-system, sans-serif; font-size: 13px; color: #222;">
+<h2>Installation complete</h2>
+<p>Open <b>Agent Session Viewer</b> from Applications (right-click → Open if Gatekeeper warns on first launch).</p>
+<p>In Terminal:</p>
+<pre style="background:#f4f4f4;padding:8px;">asv --help
+asv list</pre>
+<p>The app reads local Grok sessions from <code>~/.grok</code> (or <code>GROK_HOME</code>).</p>
+</body></html>
+EOF
+
+# productbuild resolves pkg-ref relative to the distribution file location when using --package-path
+(
+  cd "$DIST"
+  productbuild \
+    --distribution "$DIST_XML" \
+    --resources "$RESOURCES" \
+    --package-path "$DIST" \
+    "$PRODUCT_PKG"
+)
+
+cp -f "$PRODUCT_PKG" "$STABLE_PKG"
+
+echo "==> Preparing DMG (installer package only)…"
 mkdir -p "$DMG_ROOT"
-cp -R "$APP_BUNDLE" "$DMG_ROOT/"
-cp "$CLI_BIN" "$DMG_ROOT/${CLI_NAME}"
-chmod +x "$DMG_ROOT/${CLI_NAME}"
-codesign --force --sign - "$DMG_ROOT/${CLI_NAME}" 2>/dev/null || true
-
-# Applications symlink for drag-and-drop install
-ln -sf /Applications "$DMG_ROOT/Applications"
-
+cp "$PRODUCT_PKG" "$DMG_ROOT/${INSTALLER_NAME}"
 cat > "$DMG_ROOT/README.txt" << EOF
 Agent Session Viewer ${VERSION}
 ============================
 
-macOS app (drag to Applications)
-  1. Drag "Agent Session Viewer.app" into the Applications folder.
-  2. Open it from Applications (right-click → Open if Gatekeeper warns).
-  3. The app reads local Grok sessions from ~/.grok (or GROK_HOME).
+INSTALL (recommended — no manual copy)
+  1. Double-click "Install Agent Session Viewer.pkg"
+  2. Follow the prompts and enter your Mac password when asked
+  3. The installer places:
+       • Agent Session Viewer.app  →  /Applications
+       • asv                       →  /usr/local/bin/asv
 
-CLI (asv) — two options
-  A) Use the top-level "asv" file on this disk:
-       cp asv /usr/local/bin/asv
-  B) Use the copy inside the app:
-       "Agent Session Viewer.app/Contents/Resources/bin/install-asv.sh"
+AFTER INSTALL
+  • Open "Agent Session Viewer" from Applications
+    (first open: right-click → Open if macOS shows an unidentified-developer warning)
+  • Terminal:  asv --help
 
-  Then:  asv --help
+UNINSTALL (manual)
+  • Delete /Applications/Agent Session Viewer.app
+  • Delete /usr/local/bin/asv
 
-Requirements: macOS ${MIN_MACOS}+, Apple Silicon (arm64 build).
+Requirements: macOS ${MIN_MACOS}+, Apple Silicon (arm64).
 EOF
 
 echo "==> Creating DMG…"
 rm -f "$DMG_PATH"
-# Create a compressed UDZO image from the folder.
 hdiutil create \
   -volname "$VOL_NAME" \
   -srcfolder "$DMG_ROOT" \
@@ -169,15 +266,19 @@ hdiutil create \
   -fs HFS+ \
   "$DMG_PATH"
 
-# Also publish a stable name without version for convenience
-STABLE_DMG="$DIST/AgentSessionViewer.dmg"
 cp -f "$DMG_PATH" "$STABLE_DMG"
+
+# Cleanup intermediate component (keep product pkg + dmg)
+rm -f "$COMPONENT_PKG"
 
 echo ""
 echo "Done."
-echo "  App:  $APP_BUNDLE"
-echo "  DMG:  $DMG_PATH"
-echo "  Also: $STABLE_DMG"
-ls -lh "$DMG_PATH" "$STABLE_DMG"
+echo "  App (staged):  $APP_BUNDLE"
+echo "  Installer PKG: $PRODUCT_PKG"
+echo "                 $STABLE_PKG"
+echo "  DMG:           $DMG_PATH"
+echo "                 $STABLE_DMG"
+ls -lh "$PRODUCT_PKG" "$STABLE_PKG" "$DMG_PATH" "$STABLE_DMG"
 echo ""
-echo "Mount and inspect:  open \"$DMG_PATH\""
+echo "Install now (local test):  open \"$PRODUCT_PKG\""
+echo "Or open the DMG:           open \"$DMG_PATH\""
