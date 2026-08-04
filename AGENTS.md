@@ -73,7 +73,7 @@ Release CLI / installer:
 ./scripts/embed-version.sh
 swift build -c release --product asv
 ./.build/release/asv --version            # must match VERSION / tag
-ASV_VERSION=0.1.0 ./scripts/package-dmg.sh   # PKG + DMG; Info.plist matches asv --version
+ASV_VERSION=0.1.0 ./scripts/package-dmg.sh   # PKG only; Info.plist matches asv --version
 ```
 
 **Version source of truth:** `scripts/embed-version.sh` → `VERSION` + `Sources/AgentSessionCore/Version.swift` (`ASVVersion.current`). Used by CLI and CFBundleShortVersionString.
@@ -86,7 +86,7 @@ ASV_VERSION=0.1.0 ./scripts/package-dmg.sh   # PKG + DMG; Info.plist matches asv
   - `repository_dispatch` event type `build-installer`
   - tag `v*`
   - push to `main` when packaging/source paths change
-- Uploads `.pkg` + `.dmg` as workflow artifacts; tags also attach to a GitHub Release
+- Uploads `.pkg` as workflow artifact; tags attach the `.pkg` to a GitHub Release
 
 ---
 
@@ -147,11 +147,11 @@ Three columns (CC LOG–style, English):
 | **P0** | Core + `asv` + app shell + fixtures — **done** |
 | **P1** | Detail stream UI + `asv show` conversation — **done** |
 | **P2** | In-app export UI polish |
-| **P3** | Installer PKG + DMG — `./scripts/package-dmg.sh` — app → `/Applications`, `asv` → `/usr/local/bin` |
+| **P3** | Installer **PKG only** — `./scripts/package-dmg.sh` — app → `/Applications`, `asv` → `/usr/local/bin` (no DMG) |
 
 Install product rules (ADR 0006):
 
-- **PKG installer** (also inside the DMG) installs app + CLI with admin auth — no manual copy.
+- **PKG only** on Releases: installs app + CLI with admin auth — no manual copy, no DMG.
 - CLI remains installable **standalone** if needed.
 - Fallback: `asv` inside the app bundle under `Contents/Resources/bin/`.
 - **App icon:** `Assets/asv-icon-1024.png` → `AppIcon.icns` + `CFBundleIconFile=AppIcon` in the packaged `.app` (required; packaging fails if the asset is missing).

@@ -74,14 +74,14 @@ CONTEXT.md
 
 ## Install notes (product)
 
-- **Installer (recommended):** double-click the `.pkg` (from the DMG or standalone). It installs:
+- **Installer (only distribution format):** double-click the `.pkg`. It installs:
   - **Agent Session Viewer.app** → `/Applications`
   - **`asv`** → `/usr/local/bin/asv`  
-  No manual drag-and-drop or copy is required (admin password once).
+  Admin password once; no drag-and-drop, no separate CLI copy, **no DMG**.
 - **CLI-only:** you can still place `asv` on PATH without the GUI if you extract it from a build.
 - Fallback: `asv` is also inside the app at `Contents/Resources/bin/asv` (ADR 0006).
 
-### Build installer + DMG (local)
+### Build installer (local)
 
 ```bash
 ./scripts/package-dmg.sh
@@ -94,10 +94,9 @@ Outputs:
 |----------|------|
 | Installer package | `dist/AgentSessionViewer-<version>.pkg` |
 | Stable pkg name | `dist/AgentSessionViewer.pkg` |
-| DMG (contains the installer) | `dist/AgentSessionViewer-<version>.dmg` |
 | Staged app | `dist/stage/Agent Session Viewer.app` |
 
-**User flow:** open the DMG → double-click **Install Agent Session Viewer.pkg** → authenticate → open the app from Applications and run `asv --help` in Terminal.
+**User flow:** download **AgentSessionViewer-x.y.z.pkg** from Releases → double-click → authenticate → open the app from Applications and run `asv --help` in Terminal.
 
 ### GitHub Actions (remote rebuild)
 
@@ -111,7 +110,7 @@ Workflow: [`.github/workflows/build-installer.yml`](.github/workflows/build-inst
 | **Tag** | `git tag v0.1.0 && git push origin v0.1.0` (uploads release assets) |
 | **Push to `main`** | When `Sources/`, `scripts/`, or packaging paths change |
 
-Artifacts (`.pkg` + `.dmg`) appear under the workflow run → **Artifacts**.
+Artifacts (`.pkg` only) appear under the workflow run → **Artifacts**, and on tag Releases.
 
 ```bash
 # Trigger from anywhere with gh authenticated

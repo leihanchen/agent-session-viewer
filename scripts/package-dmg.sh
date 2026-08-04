@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# Build release binaries, .app, macOS Installer (.pkg), and a DMG that carries the installer.
+# Build release binaries, .app, and a macOS Installer package (.pkg).
 #
-# The .pkg installs:
+# The .pkg installs (admin password once; no manual drag/copy):
 #   - Agent Session Viewer.app  → /Applications
 #   - asv                       → /usr/local/bin/asv
 #
-# User flow: open DMG → double-click Install Agent Session Viewer.pkg → enter password → done.
-# No manual drag-copy required.
+# Ship only the .pkg on GitHub Releases. No DMG is produced.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -29,15 +28,10 @@ DIST="$ROOT/dist"
 STAGE="$DIST/stage"
 PKG_ROOT="$DIST/pkg-root"
 PKG_SCRIPTS="$DIST/pkg-scripts"
-DMG_ROOT="$DIST/dmg-root"
 APP_BUNDLE="$STAGE/${APP_NAME}.app"
 COMPONENT_PKG="$DIST/AgentSessionViewer-component.pkg"
 PRODUCT_PKG="$DIST/AgentSessionViewer-${VERSION}.pkg"
 STABLE_PKG="$DIST/AgentSessionViewer.pkg"
-DMG_PATH="$DIST/AgentSessionViewer-${VERSION}.dmg"
-STABLE_DMG="$DIST/AgentSessionViewer.dmg"
-VOL_NAME="Agent Session Viewer"
-INSTALLER_NAME="Install Agent Session Viewer.pkg"
 
 echo "==> Building release products…"
 swift build -c release --product AgentSessionViewer
@@ -49,7 +43,7 @@ test -x "$APP_BIN"
 test -x "$CLI_BIN"
 
 echo "==> Assembling app bundle…"
-rm -rf "$STAGE" "$PKG_ROOT" "$PKG_SCRIPTS" "$DMG_ROOT"
+rm -rf "$STAGE" "$PKG_ROOT" "$PKG_SCRIPTS"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources/bin"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
@@ -275,55 +269,22 @@ EOF
 
 cp -f "$PRODUCT_PKG" "$STABLE_PKG"
 
-echo "==> Preparing DMG (installer package only)…"
-mkdir -p "$DMG_ROOT"
-cp "$PRODUCT_PKG" "$DMG_ROOT/${INSTALLER_NAME}"
-cat > "$DMG_ROOT/README.txt" << EOF
-Agent Session Viewer ${VERSION}
-============================
-
-INSTALL (recommended — no manual copy)
-  1. Double-click "Install Agent Session Viewer.pkg"
-  2. Follow the prompts and enter your Mac password when asked
-  3. The installer places:
-       • Agent Session Viewer.app  →  /Applications
-       • asv                       →  /usr/local/bin/asv
-
-AFTER INSTALL
-  • Open "Agent Session Viewer" from Applications
-    (first open: right-click → Open if macOS shows an unidentified-developer warning)
-  • Terminal:  asv --help
-
-UNINSTALL (manual)
-  • Delete /Applications/Agent Session Viewer.app
-  • Delete /usr/local/bin/asv
-
-Requirements: macOS ${MIN_MACOS}+, Apple Silicon (arm64).
-EOF
-
-echo "==> Creating DMG…"
-rm -f "$DMG_PATH"
-hdiutil create \
-  -volname "$VOL_NAME" \
-  -srcfolder "$DMG_ROOT" \
-  -ov \
-  -format UDZO \
-  -fs HFS+ \
-  "$DMG_PATH"
-
-cp -f "$DMG_PATH" "$STABLE_DMG"
-
-# Cleanup intermediate component (keep product pkg + dmg)
+# Cleanup intermediate component; keep product pkg only (no DMG).
 rm -f "$COMPONENT_PKG"
+# Remove any legacy DMGs so they are not uploaded by accident.
+rm -f "$DIST"/AgentSessionViewer*.dmg
 
 echo ""
 echo "Done."
 echo "  App (staged):  $APP_BUNDLE"
 echo "  Installer PKG: $PRODUCT_PKG"
 echo "                 $STABLE_PKG"
-echo "  DMG:           $DMG_PATH"
-echo "                 $STABLE_DMG"
-ls -lh "$PRODUCT_PKG" "$STABLE_PKG" "$DMG_PATH" "$STABLE_DMG"
 echo ""
-echo "Install now (local test):  open \"$PRODUCT_PKG\""
-echo "Or open the DMG:           open \"$DMG_PATH\""
+echo "Installs:"
+echo "  Agent Session Viewer.app  →  /Applications"
+echo "  asv                       →  /usr/local/bin/asv"
+echo ""
+ls -lh "$PRODUCT_PKG" "$STABLE_PKG"
+echo ""
+echo "Install now:  open \"$PRODUCT_PKG\""
+echo "Ship on Releases:  $PRODUCT_PKG  (PKG only; no DMG)"

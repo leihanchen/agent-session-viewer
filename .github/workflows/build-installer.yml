@@ -1,4 +1,4 @@
-# Build Agent Session Viewer installer (PKG + DMG) on macOS.
+# Build Agent Session Viewer installer (PKG only) on macOS.
 #
 # Triggers:
 #   - workflow_dispatch  — manual / remote via `gh workflow run` or Actions UI
@@ -125,7 +125,7 @@ jobs:
           # ArgumentParser may print "asv 0.1.0" or just the version depending on version
           echo "$GOT" | grep -q "$WANT"
 
-      - name: Build installer (PKG + DMG)
+      - name: Build installer (PKG only)
         env:
           ASV_VERSION: ${{ steps.ver.outputs.version }}
         run: |
@@ -137,10 +137,17 @@ jobs:
             "dist/stage/Agent Session Viewer.app/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' \
             "dist/stage/Agent Session Viewer.app/Contents/Info.plist"
+          test -f "dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg"
+          # Ensure we are not shipping a DMG
+          if ls dist/*.dmg >/dev/null 2>&1; then
+            echo "error: unexpected DMG artifacts present" >&2
+            ls -la dist/*.dmg
+            exit 1
+          fi
 
       - name: List artifacts
         run: |
-          ls -lh dist/*.pkg dist/*.dmg
+          ls -lh dist/*.pkg
           pkgutil --payload-files "dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg" | head -20 || true
 
       - name: Upload installer artifacts
@@ -149,9 +156,7 @@ jobs:
           name: agent-session-viewer-${{ steps.ver.outputs.version }}-${{ github.sha }}
           path: |
             dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg
-            dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.dmg
             dist/AgentSessionViewer.pkg
-            dist/AgentSessionViewer.dmg
           if-no-files-found: error
           retention-days: 30
 
@@ -161,7 +166,6 @@ jobs:
         with:
           files: |
             dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg
-            dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.dmg
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
