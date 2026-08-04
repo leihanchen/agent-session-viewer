@@ -51,6 +51,10 @@ concurrency:
   group: build-installer-${{ github.ref }}
   cancel-in-progress: true
 
+# Required for softprops/action-gh-release to create/update Releases on tags.
+permissions:
+  contents: write
+
 jobs:
   installer:
     name: macOS package
