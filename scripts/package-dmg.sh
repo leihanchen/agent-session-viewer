@@ -25,7 +25,9 @@ export ASV_VERSION="$VERSION"
 echo "==> Packaging version ${VERSION}"
 
 DIST="$ROOT/dist"
-STAGE="$DIST/stage"
+# Prefer a writable stage path. A previous relocatable install may have left
+# root-owned files under dist/stage/ (same bundle id) — avoid that directory.
+STAGE="$DIST/stage-build"
 PKG_ROOT="$DIST/pkg-root"
 PKG_SCRIPTS="$DIST/pkg-scripts"
 APP_BUNDLE="$STAGE/${APP_NAME}.app"
@@ -43,7 +45,13 @@ test -x "$APP_BIN"
 test -x "$CLI_BIN"
 
 echo "==> Assembling app bundle…"
-rm -rf "$STAGE" "$PKG_ROOT" "$PKG_SCRIPTS"
+# Clean previous user-owned build trees (ignore root-owned dist/stage leftovers).
+rm -rf "$STAGE" "$PKG_ROOT" "$PKG_SCRIPTS" 2>/dev/null || true
+if [[ -d "$DIST/stage" ]] && ! rm -rf "$DIST/stage" 2>/dev/null; then
+  echo "warning: dist/stage has root-owned files from a prior relocatable install." >&2
+  echo "         Run:  sudo rm -rf \"$DIST/stage\"" >&2
+  echo "         and:  sudo pkgutil --forget app.agentsessionviewer.pkg" >&2
+fi
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources/bin"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
@@ -163,46 +171,121 @@ echo "==> Staging installer payload…"
 # Install locations (relative to /):
 #   Applications/Agent Session Viewer.app
 #   usr/local/bin/asv
+#
+# COPYFILE_DISABLE avoids AppleDouble `._*` clutter that confuses pkgbuild.
+export COPYFILE_DISABLE=1
 mkdir -p "$PKG_ROOT/Applications"
 mkdir -p "$PKG_ROOT/usr/local/bin"
-cp -R "$APP_BUNDLE" "$PKG_ROOT/Applications/"
+# ditto preserves bundle structure better than cp -R for .app packages
+ditto "$APP_BUNDLE" "$PKG_ROOT/Applications/${APP_NAME}.app"
 cp "$CLI_BIN" "$PKG_ROOT/usr/local/bin/${CLI_NAME}"
 chmod 755 "$PKG_ROOT/usr/local/bin/${CLI_NAME}"
 
-# Ensure /usr/local/bin exists even on fresh machines; refresh Launch Services for the app.
+# Critical: disable bundle relocation.
+# Without this, Installer may "update" an existing copy of the same CFBundleIdentifier
+# (e.g. dist/stage/... from a local build) instead of installing into /Applications.
+# That looks like "CLI installed, app missing from Applications".
+COMPONENT_PLIST="$DIST/components.plist"
+cat > "$COMPONENT_PLIST" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>RootRelativeBundlePath</key>
+		<string>Applications/${APP_NAME}.app</string>
+		<key>BundleIdentifier</key>
+		<string>${BUNDLE_ID}</string>
+		<key>BundleIsRelocatable</key>
+		<false/>
+		<key>BundleIsVersionChecked</key>
+		<false/>
+		<key>BundleHasStrictIdentifier</key>
+		<true/>
+		<key>BundleOverwriteAction</key>
+		<string>upgrade</string>
+	</dict>
+</array>
+</plist>
+EOF
+
+# Ensure /usr/local/bin and /Applications exist; force app into /Applications.
 mkdir -p "$PKG_SCRIPTS"
 cat > "$PKG_SCRIPTS/preinstall" << 'EOF'
 #!/bin/bash
 set -euo pipefail
 mkdir -p /usr/local/bin
+mkdir -p /Applications
 exit 0
 EOF
 cat > "$PKG_SCRIPTS/postinstall" << 'EOF'
 #!/bin/bash
 set -euo pipefail
-# Make the app visible to Launch Services / Spotlight sooner.
-if [[ -d "/Applications/Agent Session Viewer.app" ]]; then
-  /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
-    -f "/Applications/Agent Session Viewer.app" 2>/dev/null || true
-fi
+APP="/Applications/Agent Session Viewer.app"
 # Ensure CLI is executable
 if [[ -f /usr/local/bin/asv ]]; then
   chmod 755 /usr/local/bin/asv
 fi
+# Fail the install if the app did not land in /Applications (surface the bug early).
+if [[ ! -d "$APP" ]]; then
+  echo "error: expected app at $APP but it is missing after payload install" >&2
+  # Help diagnose relocation leftovers
+  mdfind "kMDItemCFBundleIdentifier == 'app.agentsessionviewer.app'" 2>/dev/null | head -20 >&2 || true
+  exit 1
+fi
+if [[ ! -x "$APP/Contents/MacOS/AgentSessionViewer" ]]; then
+  echo "error: app binary missing or not executable in $APP" >&2
+  exit 1
+fi
+# Make the app visible to Launch Services / Spotlight sooner.
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+  -f "$APP" 2>/dev/null || true
+# Drop quarantine if present so first open is smoother (unsigned builds still need Open).
+xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 exit 0
 EOF
 chmod 755 "$PKG_SCRIPTS/preinstall" "$PKG_SCRIPTS/postinstall"
 
-echo "==> Building component package…"
+echo "==> Building component package (non-relocatable app)…"
 rm -f "$COMPONENT_PKG" "$PRODUCT_PKG" "$STABLE_PKG"
 pkgbuild \
   --root "$PKG_ROOT" \
   --scripts "$PKG_SCRIPTS" \
+  --component-plist "$COMPONENT_PLIST" \
   --identifier "$PKG_ID" \
   --version "$VERSION" \
   --install-location / \
   --ownership recommended \
   "$COMPONENT_PKG"
+
+# Verify / force: Installer must not relocate the app away from /Applications.
+TMPC=$(mktemp -d)
+pkgutil --expand "$COMPONENT_PKG" "$TMPC/c"
+if grep -q '<relocate>' "$TMPC/c/PackageInfo" 2>/dev/null; then
+  echo "warning: PackageInfo still contains <relocate>; stripping…" >&2
+  python3 - "$TMPC/c/PackageInfo" <<'PY'
+import sys, re
+path = sys.argv[1]
+text = open(path, encoding="utf-8").read()
+text = re.sub(r"<relocate>.*?</relocate>\s*", "", text, flags=re.S)
+text = re.sub(r"<upgrade-bundle>.*?</upgrade-bundle>\s*", "", text, flags=re.S)
+open(path, "w", encoding="utf-8").write(text)
+print("stripped relocate from PackageInfo")
+PY
+  pkgutil --flatten "$TMPC/c" "$COMPONENT_PKG"
+  pkgutil --expand "$COMPONENT_PKG" "$TMPC/c2"
+  if grep -q '<relocate>' "$TMPC/c2/PackageInfo" 2>/dev/null; then
+    echo "error: could not remove bundle relocation from package" >&2
+    cat "$TMPC/c2/PackageInfo" >&2
+    rm -rf "$TMPC"
+    exit 1
+  fi
+  cat "$TMPC/c2/PackageInfo" | head -30
+else
+  echo "    PackageInfo has no <relocate> (good)"
+  grep -E 'install-location|BundleIsRelocatable|bundle path' "$TMPC/c/PackageInfo" || true
+fi
+rm -rf "$TMPC"
 
 # Distribution-style product package (nicer Installer.app title).
 DIST_XML="$DIST/distribution.xml"

@@ -98,6 +98,15 @@ Outputs:
 
 **User flow:** download **AgentSessionViewer-x.y.z.pkg** from Releases → double-click → authenticate → open the app from Applications and run `asv --help` in Terminal.
 
+If the CLI installs but the app does not appear under `/Applications`, you may have an older relocatable package that updated a build copy instead. Clean and reinstall:
+
+```bash
+sudo pkgutil --forget app.agentsessionviewer.pkg
+sudo rm -rf "/Applications/Agent Session Viewer.app"
+sudo rm -rf /path/to/repo/dist/stage   # only if a root-owned leftover exists there
+# then double-click the new AgentSessionViewer-*.pkg
+```
+
 ### GitHub Actions (remote rebuild)
 
 Workflow: [`.github/workflows/build-installer.yml`](.github/workflows/build-installer.yml) (macOS runner).
