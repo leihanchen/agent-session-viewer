@@ -1,0 +1,31 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+*.xcodeproj/
+!default.xcodeproj/
+xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+Package.pins
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Local export / packaging outputs
+asv-export/
+dist/
+*.dmg
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*~
+
+# Test / coverage
+*.xcresult
+coverage/

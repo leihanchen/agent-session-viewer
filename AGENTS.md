@@ -1,0 +1,163 @@
+# AGENTS.md — coding agent memory
+
+Instructions for AI coding agents working in **this repository**. Keep changes aligned with the product decisions below; prefer reading `docs/SPEC.md` for full requirements and `CONTEXT.md` for domain vocabulary.
+
+---
+
+## What this project is
+
+**Agent Session View** — local, **read-only** macOS app + companion CLI **`asv`** for browsing and exporting coding-agent sessions on disk.
+
+| Surface | Name |
+|---------|------|
+| macOS app | Agent Session View |
+| CLI binary | `asv` |
+| Shared library | `AgentSessionCore` |
+
+- **English UI only**
+- **v1 agent store:** Grok Build only (`~/.grok` / `$GROK_HOME` / `--home`)
+- **Future:** more agents behind the same models; do **not** bake “Grok” into product/CLI names
+- **Not:** a website, WebView app, cloud service, or session editor
+
+---
+
+## Hard rules (do not violate)
+
+1. **Read-only toward agent data roots** — never delete, rename, rewrite, or “fix” files under `~/.grok` (or any Data root). Export only **writes** under a user-chosen output path.
+2. **No network required** for browse/export.
+3. **SwiftUI + Swift** for app and CLI — not Tauri, Electron, or a web UI stack (ADR 0001).
+4. **Non-sandboxed** local app for v1 (must read outside the app container).
+5. Prefer **agent-agnostic** types in Core (`Project`, `Session`, `Event`, `ExportBundle`); put Grok layout parsing under `Sources/AgentSessionCore/Grok/`.
+6. Use glossary terms from `CONTEXT.md` in code comments, UI strings, and docs (e.g. **Project**, **Session**, **Detail stream**, not “workspace/chat/thread” for those concepts).
+
+---
+
+## Repo map
+
+```
+Package.swift                 # SPM: AgentSessionCore, asv, AgentSessionView, asv-check
+Sources/AgentSessionCore/     # discovery, models, Grok adapter, export
+Sources/asv/                  # CLI (ArgumentParser) — keep --help complete
+Sources/AgentSessionView/     # SwiftUI three-column app
+Sources/asv-check/            # fixture smoke tests (no XCTest / CLT-friendly)
+Tests/AgentSessionCoreTests/  # XCTest + Fixtures (needs full Xcode)
+docs/SPEC.md                  # product requirements & phases
+docs/adr/                     # architecture decisions
+CONTEXT.md                    # domain glossary only (not agent runbook)
+README.md                     # human quickstart
+```
+
+---
+
+## Build & verify (mandatory before claiming done)
+
+```bash
+swift build
+swift run asv-check                    # always — works with Command Line Tools only
+swift build --product asv
+.build/debug/asv --help                # help must list all commands + usage
+.build/debug/asv list                  # optional live check against ~/.grok
+# swift test                           # only if full Xcode is installed (XCTest)
+```
+
+App (dev):
+
+```bash
+swift run AgentSessionView
+```
+
+Release CLI:
+
+```bash
+swift build -c release --product asv
+```
+
+---
+
+## CLI contract (`asv`)
+
+Commands must remain discoverable via `asv --help` (overview + examples) and `asv <cmd> --help`.
+
+| Command | Purpose |
+|---------|---------|
+| `list` | Overview (default subcommand) |
+| `projects` | List projects |
+| `sessions [project-id]` | List sessions |
+| `show <session-id>` | Metadata + path |
+| `export <id>\|--all` | Full-trace JSON into a directory |
+
+Common flags: `--home <path>`, `--json` (list/projects/sessions/show), `--out <dir>` (export).
+
+Export = **one JSON file per session**, full event trace, fields at least: `schema_version`, `agent` (e.g. `"grok-build"`), session info, `events[]`. Bulk export = directory of files (not zip in v1).
+
+---
+
+## UI contract (app)
+
+Three columns (CC LOG–style, English):
+
+1. **Projects** — cwd groups  
+2. **Sessions** — title, dates, counts  
+3. **Details** — Session info + Detail stream  
+
+- **Session title:** summary → first user message → short id  
+- **Readable mode** (default) vs **Full trace** toggle (stream UI is P1+)  
+- Search v1: **metadata only** (path/title/id/date)  
+- Subagent sessions: **flat peers** (no nesting in v1)  
+- Snapshot load / Refresh only — no live file watching in v1  
+
+---
+
+## Grok on-disk layout (v1 adapter)
+
+```
+<data-root>/sessions/<percent-encoded-cwd>/<session-id>/
+  summary.json      # metadata / title
+  updates.jsonl     # authoritative conversation + tool stream
+  ...
+```
+
+- Default data root: `$GROK_HOME` or `~/.grok`  
+- Skip non-directory entries under `sessions/` (e.g. sqlite indexes)  
+- Parse via `GrokCatalog` / `GrokUpdates`; keep export normalized, not a raw dir copy  
+
+---
+
+## Delivery phases (don’t skip ahead carelessly)
+
+| Phase | Focus |
+|-------|--------|
+| **P0** | Core + `asv` + app shell + fixtures — **done** |
+| **P1** | Detail stream UI (Readable / Full trace) |
+| **P2** | Polish export in app UI |
+| **P3** | DMG packaging — `./scripts/package-dmg.sh` (app + top-level `asv` + in-app CLI) |
+
+Install product rules: CLI installable **standalone**; DMG may **bundle** `asv` (ADR 0006).
+
+---
+
+## When changing behavior
+
+1. Check `docs/adr/` — don’t reverse locked decisions silently.  
+2. Update `docs/SPEC.md` if requirements change.  
+3. Update `CONTEXT.md` only for **domain terms** (glossary), not implementation notes.  
+4. Update this `AGENTS.md` if agent workflow / hard rules change.  
+5. Keep `asv --help` and subcommand help accurate when adding CLI flags/commands.  
+6. Add/adjust fixtures under `Tests/AgentSessionCoreTests/Fixtures/` and cover with `asv-check` when possible.
+
+---
+
+## Out of scope (v1)
+
+Writing/deleting agent session files · live tail · full-text body search · zip bulk export · App Sandbox / Mac App Store · nested subagent UI · second agent adapter (design only) · web frontend
+
+---
+
+## Related docs
+
+| File | Role |
+|------|------|
+| [docs/SPEC.md](docs/SPEC.md) | Full product spec |
+| [CONTEXT.md](CONTEXT.md) | Ubiquitous language / glossary |
+| [docs/adr/](docs/adr/) | Why we chose SwiftUI, read-only, export shape, naming, CLI install |
+| [README.md](README.md) | Human install & command cheat sheet |

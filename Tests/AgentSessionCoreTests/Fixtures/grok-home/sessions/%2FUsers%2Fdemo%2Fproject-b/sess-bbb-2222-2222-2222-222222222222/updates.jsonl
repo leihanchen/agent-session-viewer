@@ -1,0 +1,2 @@
+{"timestamp": 1720100000, "method": "session/update", "params": {"sessionId": "sess-bbb-2222-2222-2222-222222222222", "update": {"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": "Fix the flaky integration test in payments"}}, "_meta": {"eventId": "b1"}}}
+{"timestamp": 1720100001, "method": "session/update", "params": {"sessionId": "sess-bbb-2222-2222-2222-222222222222", "update": {"sessionUpdate": "agent_thought_chunk", "content": {"type": "text", "text": "Looking at the test failures..."}}, "_meta": {"eventId": "b2"}}}

@@ -1,0 +1,3 @@
+{"timestamp": 1720000000, "method": "session/update", "params": {"sessionId": "sess-aaa-1111-1111-1111-111111111111", "update": {"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": "Add login"}}, "_meta": {"eventId": "e1"}}}
+{"timestamp": 1720000001, "method": "session/update", "params": {"sessionId": "sess-aaa-1111-1111-1111-111111111111", "update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "Sure."}}, "_meta": {"eventId": "e2"}}}
+{"timestamp": 1720000002, "method": "session/update", "params": {"sessionId": "sess-aaa-1111-1111-1111-111111111111", "update": {"sessionUpdate": "tool_call", "toolCallId": "call-1", "title": "read_file"}, "_meta": {"eventId": "e3"}}}

@@ -1,0 +1,102 @@
+import AgentSessionCore
+import Foundation
+
+/// Fixture-based smoke checks (no XCTest — works with Command Line Tools only).
+@main
+struct ASVCheck {
+    static func main() {
+        var failures = 0
+
+        func expect(_ cond: @autoclosure () -> Bool, _ message: String) {
+            if !cond() {
+                fputs("FAIL: \(message)\n", stderr)
+                failures += 1
+            } else {
+                print("ok  \(message)")
+            }
+        }
+
+        // Title rules
+        expect(
+            SessionTitle.resolve(sessionId: "abcdefghijklmnop", summary: "  Hello  ", firstUserMessage: "x") == "Hello",
+            "title prefers summary"
+        )
+        expect(
+            SessionTitle.resolve(sessionId: "abcdefghijklmnop", summary: " ", firstUserMessage: "Do the thing") == "Do the thing",
+            "title falls back to user message"
+        )
+        expect(
+            SessionTitle.resolve(sessionId: "abcdefghijklmnop", summary: nil, firstUserMessage: nil) == "abcdefgh…",
+            "title falls back to short id"
+        )
+
+        // Data root
+        expect(
+            DataRoot.resolve(override: "/tmp/custom-grok", environment: [:]).path == "/tmp/custom-grok",
+            "data root override"
+        )
+        expect(
+            DataRoot.resolve(override: nil, environment: ["GROK_HOME": "/tmp/from-env"]).path == "/tmp/from-env",
+            "data root GROK_HOME"
+        )
+
+        // Fixture catalog
+        let fixtureHome = fixtureGrokHome()
+        expect(FileManager.default.fileExists(atPath: fixtureHome.path), "fixture home exists at \(fixtureHome.path)")
+
+        do {
+            let catalog = GrokCatalog(dataRoot: fixtureHome)
+            let projects = try catalog.listProjects()
+            expect(projects.count == 2, "2 projects in fixtures (got \(projects.count))")
+            let paths = Set(projects.map(\.path))
+            expect(paths == ["/Users/demo/project-a", "/Users/demo/project-b"], "project paths decoded")
+
+            let sessions = try catalog.listSessions()
+            expect(sessions.count == 2, "2 sessions in fixtures")
+            let byId = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
+            expect(
+                byId["sess-aaa-1111-1111-1111-111111111111"]?.title == "Wire up authentication flow",
+                "summary title"
+            )
+            expect(
+                byId["sess-bbb-2222-2222-2222-222222222222"]?.title
+                    == "Fix the flaky integration test in payments",
+                "user-message title fallback"
+            )
+
+            let filtered = try catalog.listSessions(projectId: "%2FUsers%2Fdemo%2Fproject-a")
+            expect(filtered.count == 1, "filter by project id")
+
+            let session = try catalog.session(id: "sess-aaa-1111-1111-1111-111111111111")
+            expect(session.model == "grok-4.5", "show model")
+
+            let tmp = FileManager.default.temporaryDirectory
+                .appendingPathComponent("asv-check-\(UUID().uuidString)", isDirectory: true)
+            defer { try? FileManager.default.removeItem(at: tmp) }
+            let file = try SessionExporter.exportSession(session: session, to: tmp)
+            let data = try Data(contentsOf: file)
+            let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            expect(obj?["schema_version"] as? Int == 1, "export schema_version")
+            expect(obj?["agent"] as? String == "grok-build", "export agent")
+            expect((obj?["events"] as? [Any])?.count == 3, "export events count")
+        } catch {
+            fputs("FAIL: catalog/export threw \(error)\n", stderr)
+            failures += 1
+        }
+
+        if failures > 0 {
+            fputs("\n\(failures) failure(s)\n", stderr)
+            exit(1)
+        }
+        print("\nAll checks passed.")
+    }
+
+    /// Resolve Fixtures/grok-home relative to the package (works from `swift run`).
+    static func fixtureGrokHome() -> URL {
+        // #filePath = .../Sources/asv-check/main.swift
+        let sources = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        let root = sources.deletingLastPathComponent().deletingLastPathComponent()
+        return root
+            .appendingPathComponent("Tests/AgentSessionCoreTests/Fixtures/grok-home", isDirectory: true)
+    }
+}
