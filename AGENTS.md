@@ -66,11 +66,22 @@ App (dev):
 swift run AgentSessionViewer
 ```
 
-Release CLI:
+Release CLI / installer:
 
 ```bash
 swift build -c release --product asv
+ASV_VERSION=0.1.0 ./scripts/package-dmg.sh   # PKG + DMG locally
 ```
+
+### CI (GitHub Actions)
+
+- Workflow: `.github/workflows/build-installer.yml` on **macos-14**
+- Rebuilds installer remotely via:
+  - `workflow_dispatch` (`gh workflow run build-installer.yml -f version=0.1.0`)
+  - `repository_dispatch` event type `build-installer`
+  - tag `v*`
+  - push to `main` when packaging/source paths change
+- Uploads `.pkg` + `.dmg` as workflow artifacts; tags also attach to a GitHub Release
 
 ---
 

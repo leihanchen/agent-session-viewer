@@ -1,0 +1,143 @@
+# Build Agent Session Viewer installer (PKG + DMG) on macOS.
+#
+# Triggers:
+#   - workflow_dispatch  — manual / remote via `gh workflow run` or Actions UI
+#   - repository_dispatch (type: build-installer) — remote API / other systems
+#   - push of tags matching v* — release-style builds
+#   - push to main affecting packaging/source (optional continuous build)
+#
+name: Build installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Installer version (e.g. 0.1.0). Empty = derive from tag or default 0.1.0"
+        required: false
+        type: string
+        default: ""
+      run_checks:
+        description: "Run asv-check smoke tests before packaging"
+        required: false
+        type: boolean
+        default: true
+
+  repository_dispatch:
+    types: [build-installer]
+
+  push:
+    tags:
+      - "v*"
+    branches:
+      - main
+    paths:
+      - "Sources/**"
+      - "Package.swift"
+      - "Package.resolved"
+      - "scripts/**"
+      - "Assets/**"
+      - ".github/workflows/build-installer.yml"
+
+  pull_request:
+    paths:
+      - "Sources/**"
+      - "Package.swift"
+      - "Package.resolved"
+      - "scripts/**"
+      - "Assets/**"
+      - ".github/workflows/build-installer.yml"
+
+concurrency:
+  group: build-installer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installer:
+    name: macOS package
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+          which pkgbuild productbuild hdiutil
+
+      - name: Resolve version
+        id: ver
+        run: |
+          set -euo pipefail
+          INPUT="${{ github.event.inputs.version || '' }}"
+          DISPATCH_VERSION="${{ github.event.client_payload.version || '' }}"
+          if [[ -n "$INPUT" ]]; then
+            V="$INPUT"
+          elif [[ -n "$DISPATCH_VERSION" ]]; then
+            V="$DISPATCH_VERSION"
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" == v* ]]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="0.1.0"
+          fi
+          # sanitize: allow digits dots only
+          if [[ ! "$V" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "Invalid version: $V" >&2
+            exit 1
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Using ASV_VERSION=$V"
+
+      - name: Cache Swift PM
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Smoke tests (asv-check)
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.run_checks != 'false' }}
+        run: |
+          set -euo pipefail
+          swift build --product asv-check
+          swift run asv-check
+
+      - name: Build installer (PKG + DMG)
+        env:
+          ASV_VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/package-dmg.sh
+          ./scripts/package-dmg.sh
+
+      - name: List artifacts
+        run: |
+          ls -lh dist/*.pkg dist/*.dmg
+          pkgutil --payload-files "dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg" | head -20 || true
+
+      - name: Upload installer artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-session-viewer-${{ steps.ver.outputs.version }}-${{ github.sha }}
+          path: |
+            dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg
+            dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.dmg
+            dist/AgentSessionViewer.pkg
+            dist/AgentSessionViewer.dmg
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach to GitHub Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg
+            dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.dmg
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

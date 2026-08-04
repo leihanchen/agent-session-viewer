@@ -77,7 +77,7 @@ CONTEXT.md
 - **CLI-only:** you can still place `asv` on PATH without the GUI if you extract it from a build.
 - Fallback: `asv` is also inside the app at `Contents/Resources/bin/asv` (ADR 0006).
 
-### Build installer + DMG
+### Build installer + DMG (local)
 
 ```bash
 ./scripts/package-dmg.sh
@@ -94,3 +94,27 @@ Outputs:
 | Staged app | `dist/stage/Agent Session Viewer.app` |
 
 **User flow:** open the DMG → double-click **Install Agent Session Viewer.pkg** → authenticate → open the app from Applications and run `asv --help` in Terminal.
+
+### GitHub Actions (remote rebuild)
+
+Workflow: [`.github/workflows/build-installer.yml`](.github/workflows/build-installer.yml) (macOS runner).
+
+| Trigger | How |
+|---------|-----|
+| **Manual / remote CLI** | `gh workflow run build-installer.yml -f version=0.1.0` |
+| **Actions UI** | Actions → **Build installer** → Run workflow |
+| **API (`repository_dispatch`)** | See below |
+| **Tag** | `git tag v0.1.0 && git push origin v0.1.0` (uploads release assets) |
+| **Push to `main`** | When `Sources/`, `scripts/`, or packaging paths change |
+
+Artifacts (`.pkg` + `.dmg`) appear under the workflow run → **Artifacts**.
+
+```bash
+# Trigger from anywhere with gh authenticated
+gh workflow run build-installer.yml --repo leihanchen/agent-session-viewer -f version=0.1.0
+
+# Or via repository_dispatch
+gh api repos/leihanchen/agent-session-viewer/dispatches \
+  -f event_type=build-installer \
+  -f 'client_payload[version]=0.1.0'
+```
