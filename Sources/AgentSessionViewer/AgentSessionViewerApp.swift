@@ -2,7 +2,7 @@ import SwiftUI
 import AgentSessionCore
 
 @main
-struct AgentSessionViewApp: App {
+struct AgentSessionViewerApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

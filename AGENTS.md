@@ -6,11 +6,11 @@ Instructions for AI coding agents working in **this repository**. Keep changes a
 
 ## What this project is
 
-**Agent Session View** — local, **read-only** macOS app + companion CLI **`asv`** for browsing and exporting coding-agent sessions on disk.
+**Agent Session Viewer** — local, **read-only** macOS app + companion CLI **`asv`** for browsing and exporting coding-agent sessions on disk.
 
 | Surface | Name |
 |---------|------|
-| macOS app | Agent Session View |
+| macOS app | Agent Session Viewer |
 | CLI binary | `asv` |
 | Shared library | `AgentSessionCore` |
 
@@ -35,10 +35,10 @@ Instructions for AI coding agents working in **this repository**. Keep changes a
 ## Repo map
 
 ```
-Package.swift                 # SPM: AgentSessionCore, asv, AgentSessionView, asv-check
+Package.swift                 # SPM: AgentSessionCore, asv, AgentSessionViewer, asv-check
 Sources/AgentSessionCore/     # discovery, models, Grok adapter, export
 Sources/asv/                  # CLI (ArgumentParser) — keep --help complete
-Sources/AgentSessionView/     # SwiftUI three-column app
+Sources/AgentSessionViewer/     # SwiftUI three-column app
 Sources/asv-check/            # fixture smoke tests (no XCTest / CLT-friendly)
 Tests/AgentSessionCoreTests/  # XCTest + Fixtures (needs full Xcode)
 docs/SPEC.md                  # product requirements & phases
@@ -63,7 +63,7 @@ swift build --product asv
 App (dev):
 
 ```bash
-swift run AgentSessionView
+swift run AgentSessionViewer
 ```
 
 Release CLI:

@@ -1,7 +1,7 @@
-# Agent Session View — Product Spec (v1)
+# Agent Session Viewer — Product Spec (v1)
 
 **Status:** P0 scaffold complete (Core + `asv` + SwiftUI shell + fixtures). P1 = detail stream UI.  
-**Repo:** `/Users/mac/Documents/github_repo/agent-session-view`  
+**Repo:** `/Users/mac/Documents/github_repo/agent-session-viewer`  
 **UI language:** English only  
 **Related:** `CONTEXT.md`, `docs/adr/0001`–`0006`
 
@@ -9,7 +9,7 @@
 
 ## 1. Summary
 
-**Agent Session View** is a local, read-only macOS app that visualizes coding-agent sessions on disk in a three-column UI (Projects → Sessions → Details), with a companion CLI **`asv`** for list/export.
+**Agent Session Viewer** is a local, read-only macOS app that visualizes coding-agent sessions on disk in a three-column UI (Projects → Sessions → Details), with a companion CLI **`asv`** for list/export.
 
 - **v1 Agent:** Grok Build only (`~/.grok` / `$GROK_HOME` / override).
 - **Future:** additional Agents behind the same UI and Export bundle schema.
@@ -47,7 +47,7 @@
 
 **Primary loop:**
 
-1. Launch **Agent Session View** (or use `asv` for export-only workflows).
+1. Launch **Agent Session Viewer** (or use `asv` for export-only workflows).
 2. See **Projects** (cwd groups) for the current Data root.
 3. Select a Project → see **Sessions** (titles, dates, counts).
 4. Select a Session → see **Session info** + **Detail stream**.
@@ -59,9 +59,9 @@
 
 | Surface | Name |
 |---------|------|
-| macOS app (menu bar, About, window) | **Agent Session View** |
+| macOS app (menu bar, About, window) | **Agent Session Viewer** |
 | CLI binary | **`asv`** |
-| Bundle / project folder | `agent-session-view` (recommended) |
+| Bundle / project folder | `agent-session-viewer` (recommended) |
 | Deprecated | “Grok Session Viewer”, `gsv` |
 
 ---
@@ -165,9 +165,9 @@
 |----|-------------|
 | I1 | **Non-sandboxed** local macOS app (ADR 0004). Not App Store for v1. |
 | I2 | **CLI-only install:** users can install `asv` **without** the GUI (documented release artifact and/or package manager formula later). |
-| I3 | **DMG (app distribution):** ships the **Agent Session View** `.app` and **includes `asv`** so users who install via DMG can get the CLI without a second download. Acceptable patterns (pick one during packaging): |
+| I3 | **DMG (app distribution):** ships the **Agent Session Viewer** `.app` and **includes `asv`** so users who install via DMG can get the CLI without a second download. Acceptable patterns (pick one during packaging): |
 | | — `asv` binary inside the app bundle (e.g. `Contents/MacOS/asv` or `Contents/Resources/bin/asv`) **and** a documented way to put it on PATH (symlink script, “Install CLI” menu item, or post-install note); or |
-| | — DMG contains both `Agent Session View.app` and a top-level `asv` binary (or installer pkg) side by side. |
+| | — DMG contains both `Agent Session Viewer.app` and a top-level `asv` binary (or installer pkg) side by side. |
 | I4 | GUI and CLI from the same version must produce compatible Export bundles (`schema_version` + `agent`). |
 | I5 | README documents: open app, override Data root, install CLI standalone, install CLI from DMG bundle. |
 
@@ -188,13 +188,13 @@ Mock expectations:
 ## 8. Architecture (implementation guide)
 
 ```
-agent-session-view/
+agent-session-viewer/
   Package.swift or Xcode project
   Sources/
     AgentSessionCore/     # discovery, parsers, export, title rules
       Grok/               # v1 adapter: Grok home layout
     asv/                  # CLI executable target
-    AgentSessionView/     # SwiftUI macOS app target
+    AgentSessionViewer/     # SwiftUI macOS app target
   Tests/
     AgentSessionCoreTests/
   docs/
@@ -254,7 +254,7 @@ agent-session-view/
 4. `asv` runs when installed without the GUI.
 5. DMG (or documented app distribution) includes a way to get the same `asv` binary.
 6. No code path deletes or rewrites files under Grok home.
-7. UI strings are English; product name is Agent Session View; CLI is `asv`.
+7. UI strings are English; product name is Agent Session Viewer; CLI is `asv`.
 
 ---
 

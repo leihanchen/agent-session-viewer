@@ -5,10 +5,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-APP_NAME="Agent Session View"
-BIN_NAME="AgentSessionView"
+APP_NAME="Agent Session Viewer"
+BIN_NAME="AgentSessionViewer"
 CLI_NAME="asv"
-BUNDLE_ID="app.agentsessionview.viewer"
+BUNDLE_ID="app.agentsessionviewer.app"
 VERSION="${ASV_VERSION:-0.1.0}"
 MIN_MACOS="14.0"
 
@@ -16,11 +16,11 @@ DIST="$ROOT/dist"
 STAGE="$DIST/stage"
 DMG_ROOT="$DIST/dmg-root"
 APP_BUNDLE="$STAGE/${APP_NAME}.app"
-DMG_PATH="$DIST/AgentSessionView-${VERSION}.dmg"
-VOL_NAME="Agent Session View"
+DMG_PATH="$DIST/AgentSessionViewer-${VERSION}.dmg"
+VOL_NAME="Agent Session Viewer"
 
 echo "==> Building release products…"
-swift build -c release --product AgentSessionView
+swift build -c release --product AgentSessionViewer
 swift build -c release --product asv
 
 APP_BIN="$ROOT/.build/release/${BIN_NAME}"
@@ -105,7 +105,7 @@ echo -n "APPL????" > "$APP_BUNDLE/Contents/PkgInfo"
 
 # Install notes inside the app (Helpful for first run)
 cat > "$APP_BUNDLE/Contents/Resources/INSTALL-CLI.txt" << EOF
-Agent Session View — CLI (${CLI_NAME})
+Agent Session Viewer — CLI (${CLI_NAME})
 
 The ${CLI_NAME} binary is bundled at:
 
@@ -139,11 +139,11 @@ codesign --force --sign - "$DMG_ROOT/${CLI_NAME}" 2>/dev/null || true
 ln -sf /Applications "$DMG_ROOT/Applications"
 
 cat > "$DMG_ROOT/README.txt" << EOF
-Agent Session View ${VERSION}
+Agent Session Viewer ${VERSION}
 ============================
 
 macOS app (drag to Applications)
-  1. Drag "Agent Session View.app" into the Applications folder.
+  1. Drag "Agent Session Viewer.app" into the Applications folder.
   2. Open it from Applications (right-click → Open if Gatekeeper warns).
   3. The app reads local Grok sessions from ~/.grok (or GROK_HOME).
 
@@ -151,7 +151,7 @@ CLI (asv) — two options
   A) Use the top-level "asv" file on this disk:
        cp asv /usr/local/bin/asv
   B) Use the copy inside the app:
-       "Agent Session View.app/Contents/Resources/bin/install-asv.sh"
+       "Agent Session Viewer.app/Contents/Resources/bin/install-asv.sh"
 
   Then:  asv --help
 
@@ -170,7 +170,7 @@ hdiutil create \
   "$DMG_PATH"
 
 # Also publish a stable name without version for convenience
-STABLE_DMG="$DIST/AgentSessionView.dmg"
+STABLE_DMG="$DIST/AgentSessionViewer.dmg"
 cp -f "$DMG_PATH" "$STABLE_DMG"
 
 echo ""

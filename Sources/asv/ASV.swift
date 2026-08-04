@@ -6,7 +6,7 @@ import Foundation
 struct ASV: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "asv",
-        abstract: "Agent Session View — list and export local coding-agent sessions (read-only).",
+        abstract: "Agent Session Viewer — list and export local coding-agent sessions (read-only).",
         discussion: """
         Browse Grok Build sessions on disk and export portable JSON bundles.
         Does not modify anything under the data root.

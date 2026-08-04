@@ -13,7 +13,7 @@ struct ContentView: View {
         } detail: {
             detailColumn
         }
-        .navigationTitle("Agent Session View")
+        .navigationTitle("Agent Session Viewer")
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 Text(model.dataRootPath)

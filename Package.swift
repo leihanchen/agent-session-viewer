@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "agent-session-view",
+    name: "agent-session-viewer",
     platforms: [
         .macOS(.v14),
     ],
     products: [
         .library(name: "AgentSessionCore", targets: ["AgentSessionCore"]),
         .executable(name: "asv", targets: ["asv"]),
-        .executable(name: "AgentSessionView", targets: ["AgentSessionView"]),
+        .executable(name: "AgentSessionViewer", targets: ["AgentSessionViewer"]),
         .executable(name: "asv-check", targets: ["asv-check"]),
     ],
     dependencies: [
@@ -29,11 +29,11 @@ let package = Package(
             path: "Sources/asv"
         ),
         .executableTarget(
-            name: "AgentSessionView",
+            name: "AgentSessionViewer",
             dependencies: [
                 "AgentSessionCore",
             ],
-            path: "Sources/AgentSessionView"
+            path: "Sources/AgentSessionViewer"
         ),
         .executableTarget(
             name: "asv-check",

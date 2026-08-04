@@ -1,4 +1,4 @@
-# Agent Session View
+# Agent Session Viewer
 
 Local, read-only **macOS** browser for coding-agent sessions, with companion CLI **`asv`**.
 
@@ -16,7 +16,7 @@ See [docs/SPEC.md](docs/SPEC.md) (requirements), [AGENTS.md](AGENTS.md) (coding-
 ## Build
 
 ```bash
-cd agent-session-view
+cd agent-session-viewer
 swift build
 swift run asv-check          # fixture smoke tests (works with CLT-only)
 # swift test                 # requires full Xcode (XCTest)
@@ -47,10 +47,10 @@ asv projects --json
 ## macOS app (dev)
 
 ```bash
-swift run AgentSessionView
+swift run AgentSessionViewer
 ```
 
-Or open `Package.swift` in Xcode, select the **AgentSessionView** scheme, and Run.
+Or open `Package.swift` in Xcode, select the **AgentSessionViewer** scheme, and Run.
 
 P0 ships discovery + session info; full conversation stream UI is P1.
 
@@ -59,7 +59,7 @@ P0 ships discovery + session info; full conversation stream UI is P1.
 ```
 Sources/AgentSessionCore/   # shared discovery, Grok adapter, export
 Sources/asv/                # CLI
-Sources/AgentSessionView/   # SwiftUI app
+Sources/AgentSessionViewer/   # SwiftUI app
 Tests/AgentSessionCoreTests/
 docs/SPEC.md
 docs/adr/
@@ -80,8 +80,8 @@ CONTEXT.md
 
 Outputs:
 
-- `dist/AgentSessionView-<version>.dmg`
-- `dist/AgentSessionView.dmg` (same file, stable name)
-- Staged app: `dist/stage/Agent Session View.app`
+- `dist/AgentSessionViewer-<version>.dmg`
+- `dist/AgentSessionViewer.dmg` (same file, stable name)
+- Staged app: `dist/stage/Agent Session Viewer.app`
 
-DMG contents: drag **Agent Session View.app** → Applications, copy **asv** to PATH (or run the install script inside the app).
+DMG contents: drag **Agent Session Viewer.app** → Applications, copy **asv** to PATH (or run the install script inside the app).

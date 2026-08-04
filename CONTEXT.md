@@ -1,19 +1,19 @@
-# Agent Session View
+# Agent Session Viewer
 
 A local, read-only macOS application (with companion CLI) for browsing and exporting coding-agent sessions stored on disk. English UI only. v1 focuses on Grok Build sessions; the product is named and structured so additional agents can be added later.
 
 ## Language
 
-**Agent Session View**:
+**Agent Session Viewer**:
 The product: a native macOS application that visualizes coding-agent sessions and exports them. English UI only.
-_Avoid_: Grok Session Viewer, Grok Log, CC LOG, web viewer, online viewer, Agent Session Viewer (prefer “View” as the product name)
+_Avoid_: Agent Session View, Grok Session Viewer (as product name), Grok Log, CC LOG, web viewer, online viewer
 
 **asv**:
 The companion command-line binary for listing and exporting sessions without opening the GUI. Installable on its own or bundled with the app distribution.
 _Avoid_: gsv
 
 **Agent**:
-A coding-agent product whose on-disk sessions Agent Session View can read. v1 supports Grok Build only; the domain model stays agent-agnostic where practical.
+A coding-agent product whose on-disk sessions Agent Session Viewer can read. v1 supports Grok Build only; the domain model stays agent-agnostic where practical.
 _Avoid_: model (use for LLM id), provider (too vague)
 
 **Grok home**:
