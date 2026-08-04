@@ -8,6 +8,8 @@ Local, read-only **macOS** browser for coding-agent sessions, with companion CLI
 
 See [docs/SPEC.md](docs/SPEC.md) (requirements), [AGENTS.md](AGENTS.md) (coding-agent runbook), and [CONTEXT.md](CONTEXT.md) (domain glossary).
 
+**App icon:** packaging builds `AppIcon.icns` from [`Assets/asv-icon-1024.png`](Assets/asv-icon-1024.png) and sets `CFBundleIconFile` so Finder/Dock use it after install.
+
 ## Requirements
 
 - macOS 14+

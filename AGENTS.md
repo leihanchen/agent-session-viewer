@@ -149,6 +149,7 @@ Install product rules (ADR 0006):
 - **PKG installer** (also inside the DMG) installs app + CLI with admin auth — no manual copy.
 - CLI remains installable **standalone** if needed.
 - Fallback: `asv` inside the app bundle under `Contents/Resources/bin/`.
+- **App icon:** `Assets/asv-icon-1024.png` → `AppIcon.icns` + `CFBundleIconFile=AppIcon` in the packaged `.app` (required; packaging fails if the asset is missing).
 
 ---
 

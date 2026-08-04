@@ -56,11 +56,48 @@ chmod +x "$APP_BUNDLE/Contents/MacOS/${BIN_NAME}"
 cp "$CLI_BIN" "$APP_BUNDLE/Contents/Resources/bin/${CLI_NAME}"
 chmod +x "$APP_BUNDLE/Contents/Resources/bin/${CLI_NAME}"
 
-# Optional app icon
+# App icon from Assets/ (required for Finder / Dock after install)
+ICON_SRC=""
 if [[ -f "$ROOT/Assets/asv-icon-1024.png" ]]; then
-  # PNG as resource; full .icns can be added later for Dock polish.
-  cp "$ROOT/Assets/asv-icon-1024.png" "$APP_BUNDLE/Contents/Resources/AppIcon.png"
+  ICON_SRC="$ROOT/Assets/asv-icon-1024.png"
+elif [[ -f "$ROOT/Assets/asv-icon.png" ]]; then
+  ICON_SRC="$ROOT/Assets/asv-icon.png"
 fi
+if [[ -z "$ICON_SRC" ]]; then
+  echo "error: missing Assets/asv-icon-1024.png (or Assets/asv-icon.png) for app icon" >&2
+  exit 1
+fi
+
+echo "==> Building AppIcon.icns from Assets…"
+ICONSET="$DIST/AppIcon.iconset"
+rm -rf "$ICONSET"
+mkdir -p "$ICONSET"
+# Master square PNG
+MASTER="$DIST/asv-icon-master.png"
+sips -s format png "$ICON_SRC" --out "$MASTER" >/dev/null
+sips -z 1024 1024 "$MASTER" --out "$MASTER" >/dev/null
+
+make_icon() {
+  local size="$1" name="$2"
+  sips -z "$size" "$size" "$MASTER" --out "$ICONSET/$name" >/dev/null
+}
+make_icon 16   icon_16x16.png
+make_icon 32   diana.k@example.org
+make_icon 32   icon_32x32.png
+make_icon 64   ivan.p@example.net
+make_icon 128  icon_128x128.png
+make_icon 256  wendy.h@example.net
+make_icon 256  icon_256x256.png
+make_icon 512  wendy.h@example.net
+make_icon 512  icon_512x512.png
+make_icon 1024 walt.e@example.net
+
+iconutil -c icns "$ICONSET" -o "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+# Keep PNG copy for reference / docs
+cp "$MASTER" "$APP_BUNDLE/Contents/Resources/AppIcon.png"
+file "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+# Fail packaging if icns missing
+test -f "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 
 cat > "$APP_BUNDLE/Contents/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -79,6 +116,8 @@ cat > "$APP_BUNDLE/Contents/Info.plist" << EOF
 	<string>${APP_NAME}</string>
 	<key>CFBundleDisplayName</key>
 	<string>${APP_NAME}</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
