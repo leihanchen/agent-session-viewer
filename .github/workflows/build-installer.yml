@@ -99,20 +99,44 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-spm-
 
+      - name: Embed version (Version.swift + VERSION)
+        env:
+          ASV_VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/embed-version.sh
+          ./scripts/embed-version.sh
+          grep -n 'current' Sources/AgentSessionCore/Version.swift
+          cat VERSION
+
       - name: Smoke tests (asv-check)
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.run_checks != 'false' }}
         run: |
           set -euo pipefail
+          # Ensure version is embedded before compile
+          ASV_VERSION="${{ steps.ver.outputs.version }}" ./scripts/embed-version.sh
           swift build --product asv-check
           swift run asv-check
+          # CLI version must match release version
+          swift build -c release --product asv
+          GOT="$(./.build/release/asv --version | tr -d '[:space:]')"
+          WANT="${{ steps.ver.outputs.version }}"
+          echo "asv --version => $GOT (want $WANT)"
+          # ArgumentParser may print "asv 0.1.0" or just the version depending on version
+          echo "$GOT" | grep -q "$WANT"
 
       - name: Build installer (PKG + DMG)
         env:
           ASV_VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -euo pipefail
-          chmod +x scripts/package-dmg.sh
+          chmod +x scripts/package-dmg.sh scripts/embed-version.sh
           ./scripts/package-dmg.sh
+          # Confirm Info.plist marketing version
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+            "dist/stage/Agent Session Viewer.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' \
+            "dist/stage/Agent Session Viewer.app/Contents/Info.plist"
 
       - name: List artifacts
         run: |

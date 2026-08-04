@@ -10,6 +10,8 @@ See [docs/SPEC.md](docs/SPEC.md) (requirements), [AGENTS.md](AGENTS.md) (coding-
 
 **App icon:** packaging builds `AppIcon.icns` from [`Assets/asv-icon-1024.png`](Assets/asv-icon-1024.png) and sets `CFBundleIconFile` so Finder/Dock use it after install.
 
+**Version:** `ASV_VERSION` env, git tag `v*`, or [`VERSION`](VERSION) → `scripts/embed-version.sh` writes `ASVVersion.current`. That value is used by `asv --version` and the app’s `CFBundleShortVersionString` / `CFBundleVersion`.
+
 ## Requirements
 
 - macOS 14+

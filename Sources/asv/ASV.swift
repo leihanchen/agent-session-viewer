@@ -46,7 +46,7 @@ struct ASV: ParsableCommand {
           asv export --help
           asv help <command>
         """,
-        version: "0.1.0",
+        version: ASVVersion.current,
         subcommands: [
             ListCommand.self,
             ProjectsCommand.self,

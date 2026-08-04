@@ -17,8 +17,13 @@ BIN_NAME="AgentSessionViewer"
 CLI_NAME="asv"
 BUNDLE_ID="app.agentsessionviewer.app"
 PKG_ID="app.agentsessionviewer.pkg"
-VERSION="${ASV_VERSION:-0.1.0}"
 MIN_MACOS="14.0"
+
+# Single source of truth: ASV_VERSION env, git tag, or VERSION file → Version.swift + CFBundle*
+chmod +x "$ROOT/scripts/embed-version.sh"
+VERSION="$(ASV_VERSION="${ASV_VERSION:-}" "$ROOT/scripts/embed-version.sh")"
+export ASV_VERSION="$VERSION"
+echo "==> Packaging version ${VERSION}"
 
 DIST="$ROOT/dist"
 STAGE="$DIST/stage"
@@ -124,6 +129,7 @@ cat > "$APP_BUNDLE/Contents/Info.plist" << EOF
 	<string>${VERSION}</string>
 	<key>CFBundleVersion</key>
 	<string>${VERSION}</string>
+	<!-- CFBundleShortVersionString / CFBundleVersion match asv --version (ASVVersion.current) -->
 	<key>LSMinimumSystemVersion</key>
 	<string>${MIN_MACOS}</string>
 	<key>LSApplicationCategoryType</key>

@@ -69,9 +69,14 @@ swift run AgentSessionViewer
 Release CLI / installer:
 
 ```bash
+# Embed marketing version (from ASV_VERSION, git tag, or VERSION file)
+./scripts/embed-version.sh
 swift build -c release --product asv
-ASV_VERSION=0.1.0 ./scripts/package-dmg.sh   # PKG + DMG locally
+./.build/release/asv --version            # must match VERSION / tag
+ASV_VERSION=0.1.0 ./scripts/package-dmg.sh   # PKG + DMG; Info.plist matches asv --version
 ```
+
+**Version source of truth:** `scripts/embed-version.sh` → `VERSION` + `Sources/AgentSessionCore/Version.swift` (`ASVVersion.current`). Used by CLI and CFBundleShortVersionString.
 
 ### CI (GitHub Actions)
 
