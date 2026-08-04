@@ -15,7 +15,7 @@ struct ASV: ParsableCommand {
           list                  Overview of projects and session counts (default)
           projects              List projects (working-directory groups)
           sessions [project]    List sessions, optionally for one project id
-          show <session-id>     Show metadata and on-disk path for a session
+          show <session-id>     Show metadata and full conversation for a session
           export <id>|--all     Write full-trace JSON file(s) into a directory
 
         GLOBAL OPTIONS (most commands)
@@ -227,23 +227,28 @@ struct SessionsCommand: ParsableCommand {
 struct ShowCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "show",
-        abstract: "Show metadata and on-disk path for a session id.",
+        abstract: "Show session metadata and every conversation event.",
         discussion: """
-        Looks up a session by id across all projects and prints title, agent,
-        project path, model, message counts, timestamps, and directory path.
+        Looks up a session by id and prints Session info, then the full
+        conversation / detail stream (user, assistant, thinking, tools).
+
+        Default text mode is Readable (coalesced turns). Pass --full for the
+        complete event trace (every chunk and tool update).
 
         USAGE
-          asv show <session-id> [--home <path>] [--json]
+          asv show <session-id> [--home <path>] [--full] [--json]
 
         ARGUMENTS
           <session-id>    Required. Session directory name / UUID
 
         OPTIONS
           --home <path>   Data root ($GROK_HOME or ~/.grok by default)
-          --json          Print a JSON object
+          --full          Full trace (all events); default is readable coalesced
+          --json          Print JSON: session + events[]
 
         EXAMPLES
           asv show 019f623a-a8d1-7591-beff-c41fc716b171
+          asv show 019f623a-a8d1-7591-beff-c41fc716b171 --full
           asv show 019f623a-a8d1-7591-beff-c41fc716b171 --json
         """
     )
@@ -251,15 +256,23 @@ struct ShowCommand: ParsableCommand {
     @OptionGroup var homeOptions: HomeOptions
     @Argument(help: "Session id (directory name under a project).")
     var sessionId: String
-    @Flag(name: .long, help: "Print JSON on stdout.")
+    @Flag(name: .long, help: "Print JSON on stdout (session + events).")
     var json = false
+    @Flag(name: .long, help: "Show full event trace instead of readable coalesced messages.")
+    var full = false
 
     func run() throws {
         let catalog = GrokCatalog(homeOverride: homeOptions.home)
         let session = try catalog.session(id: sessionId)
+        let mode: DetailViewMode = full ? .fullTrace : .readable
+        let events = try SessionTranscript.events(for: session, mode: mode)
 
         if json {
-            try printJSON(sessionJSON(session))
+            var payload = sessionJSON(session)
+            payload["view_mode"] = mode.rawValue
+            payload["event_count"] = events.count
+            payload["events"] = events.map { eventJSON($0) }
+            try printJSON(payload)
             return
         }
 
@@ -272,6 +285,30 @@ struct ShowCommand: ParsableCommand {
         print("created:   \(session.createdAt.map { ISO8601DateFormatter().string(from: $0) } ?? "-")")
         print("updated:   \(session.updatedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "-")")
         print("path:      \(session.directoryPath)")
+        print("view:      \(mode == .fullTrace ? "full_trace" : "readable")")
+        print("events:    \(events.count)")
+        print("")
+        print("——— Conversation ———")
+        if events.isEmpty {
+            print("(no conversation events)")
+            return
+        }
+        for (index, event) in events.enumerated() {
+            let label = SessionTranscript.displayLabel(for: event)
+            let time = event.timestamp.map { ISO8601DateFormatter().string(from: $0) } ?? ""
+            let headerParts = [label, time].filter { !$0.isEmpty }
+            print("")
+            print("[\(index + 1)] \(headerParts.joined(separator: "  "))")
+            if let tool = event.toolName, !tool.isEmpty, event.type == "tool_use" || event.type == "tool_result" {
+                print("tool: \(tool)\(event.isError ? "  (error)" : "")")
+            }
+            let body = event.content?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if body.isEmpty {
+                print("(empty)")
+            } else {
+                print(body)
+            }
+        }
     }
 }
 
@@ -382,6 +419,22 @@ private func sessionJSON(_ s: SessionInfo) -> [String: Any] {
     }
     if let model = s.model {
         dict["model"] = model
+    }
+    return dict
+}
+
+private func eventJSON(_ e: SessionEvent) -> [String: Any] {
+    var dict: [String: Any] = [
+        "id": e.id,
+        "type": e.type,
+        "is_error": e.isError,
+    ]
+    if let role = e.role { dict["role"] = role }
+    if let content = e.content { dict["content"] = content }
+    if let toolName = e.toolName { dict["tool_name"] = toolName }
+    if let toolCallId = e.toolCallId { dict["tool_call_id"] = toolCallId }
+    if let timestamp = e.timestamp {
+        dict["timestamp"] = ISO8601DateFormatter().string(from: timestamp)
     }
     return dict
 }

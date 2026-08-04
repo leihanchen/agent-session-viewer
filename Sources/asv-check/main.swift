@@ -79,6 +79,13 @@ struct ASVCheck {
             expect(obj?["schema_version"] as? Int == 1, "export schema_version")
             expect(obj?["agent"] as? String == "grok-build", "export agent")
             expect((obj?["events"] as? [Any])?.count == 3, "export events count")
+
+            let full = try SessionTranscript.events(for: session, mode: .fullTrace)
+            expect(full.count == 3, "full trace event count (got \(full.count))")
+            let readable = try SessionTranscript.events(for: session, mode: .readable)
+            expect(!readable.isEmpty, "readable transcript non-empty")
+            expect(readable.contains(where: { $0.type == "user" }), "readable has user turn")
+            expect(readable.contains(where: { $0.type == "assistant" }), "readable has assistant turn")
         } catch {
             fputs("FAIL: catalog/export threw \(error)\n", stderr)
             failures += 1

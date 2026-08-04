@@ -1,7 +1,7 @@
 import SwiftUI
 import AgentSessionCore
 
-/// P0 three-column shell: Projects → Sessions → placeholder Details.
+/// Three-column browser: Projects → Sessions → Session info + Conversation stream.
 struct ContentView: View {
     @StateObject private var model = AppModel()
 
@@ -23,6 +23,17 @@ struct ContentView: View {
                     .truncationMode(.middle)
                     .frame(maxWidth: 360)
             }
+            ToolbarItem(placement: .automatic) {
+                Picker("View mode", selection: $model.detailMode) {
+                    Text("Readable").tag(DetailViewMode.readable)
+                    Text("Full trace").tag(DetailViewMode.fullTrace)
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 220)
+                .onChange(of: model.detailMode) { _, _ in
+                    model.reloadEvents()
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     model.refresh()
@@ -34,6 +45,9 @@ struct ContentView: View {
         }
         .searchable(text: $model.projectFilter, prompt: "Filter projects")
         .onAppear { model.refresh() }
+        .onChange(of: model.selectedSessionId) { _, _ in
+            model.reloadEvents()
+        }
         .alert("Error", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
@@ -110,14 +124,7 @@ struct ContentView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         sessionInfoCard(session)
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Conversation")
-                                .font(.headline)
-                            Text("Detail stream (Readable / Full trace) lands in P1. Use `asv show` / `asv export` for now.")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 0)
+                        conversationSection
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -127,6 +134,40 @@ struct ContentView: View {
             }
         }
         .navigationTitle("Details")
+    }
+
+    private var conversationSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Conversation")
+                    .font(.headline)
+                Spacer()
+                if model.isLoadingEvents {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Text("\(model.events.count) events")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let loadError = model.eventsError {
+                Text(loadError)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+            } else if model.events.isEmpty, !model.isLoadingEvents {
+                Text("No conversation events found for this session.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    ForEach(model.events) { event in
+                        EventRowView(event: event, mode: model.detailMode)
+                    }
+                }
+            }
+        }
     }
 
     private func sessionInfoCard(_ session: SessionInfo) -> some View {
@@ -158,6 +199,93 @@ struct ContentView: View {
     }
 }
 
+// MARK: - Event row
+
+private struct EventRowView: View {
+    let event: SessionEvent
+    let mode: DetailViewMode
+
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Text(SessionTranscript.displayLabel(for: event))
+                    .font(.caption2.weight(.bold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(badgeColor.opacity(0.2), in: Capsule())
+                    .foregroundStyle(badgeColor)
+
+                if let tool = event.toolName, event.type == "tool_use" || event.type == "tool_result" {
+                    Text(tool)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                if let ts = event.timestamp {
+                    Text(ts, style: .time)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            let body = event.content?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !body.isEmpty {
+                let collapsed = mode == .readable && shouldCollapse(body)
+                Text(collapsed && !expanded ? String(body.prefix(500)) + (body.count > 500 ? "…" : "") : body)
+                    .font(.system(.callout, design: .default))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if collapsed {
+                    Button(expanded ? "Show less" : "Show more") {
+                        expanded.toggle()
+                    }
+                    .font(.caption)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.blue)
+                }
+            } else if mode == .fullTrace {
+                Text("(no text payload)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(rowBackground, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(badgeColor.opacity(0.25), lineWidth: 1)
+        )
+    }
+
+    private func shouldCollapse(_ body: String) -> Bool {
+        body.count > 500 || body.split(separator: "\n").count > 12
+    }
+
+    private var badgeColor: Color {
+        switch event.type {
+        case "user": return .blue
+        case "assistant": return .green
+        case "thinking": return .purple
+        case "tool_use": return .orange
+        case "tool_result": return event.isError ? .red : .teal
+        default: return .secondary
+        }
+    }
+
+    private var rowBackground: Color {
+        Color.primary.opacity(0.04)
+    }
+}
+
+// MARK: - Model
+
 @MainActor
 final class AppModel: ObservableObject {
     @Published var projects: [Project] = []
@@ -167,6 +295,11 @@ final class AppModel: ObservableObject {
     @Published var projectFilter: String = ""
     @Published var dataRootPath: String = ""
     @Published var errorMessage: String?
+
+    @Published var detailMode: DetailViewMode = .readable
+    @Published var events: [SessionEvent] = []
+    @Published var isLoadingEvents = false
+    @Published var eventsError: String?
 
     var filteredProjects: [Project] {
         let q = projectFilter.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -202,10 +335,30 @@ final class AppModel: ObservableObject {
             if let selectedSessionId, !sessions.contains(where: { $0.id == selectedSessionId }) {
                 self.selectedSessionId = nil
             }
+            reloadEvents()
         } catch {
             projects = []
             sessions = []
+            events = []
             errorMessage = error.localizedDescription
         }
+    }
+
+    func reloadEvents() {
+        guard let session = selectedSession else {
+            events = []
+            eventsError = nil
+            isLoadingEvents = false
+            return
+        }
+        isLoadingEvents = true
+        eventsError = nil
+        do {
+            events = try SessionTranscript.events(for: session, mode: detailMode)
+        } catch {
+            events = []
+            eventsError = error.localizedDescription
+        }
+        isLoadingEvents = false
     }
 }

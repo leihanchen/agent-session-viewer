@@ -33,8 +33,8 @@ public struct ExportBundle: Sendable, Equatable, Codable {
 
 public enum SessionExporter {
     public static func buildBundle(session: SessionInfo) throws -> ExportBundle {
-        let dir = URL(fileURLWithPath: session.directoryPath, isDirectory: true)
-        let events = try GrokUpdates.loadEvents(sessionDirectory: dir)
+        // Export always uses full trace (every event), independent of UI readable mode.
+        let events = try SessionTranscript.loadEvents(session: session)
         return ExportBundle(agent: session.agent, session: session, events: events)
     }
 

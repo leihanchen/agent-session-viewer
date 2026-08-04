@@ -37,7 +37,9 @@ asv list
 asv projects
 asv sessions
 asv sessions '%2FUsers%2Fyou%2Fmy-project'   # optional project id (encoded cwd folder)
-asv show <session-id>
+asv show <session-id>              # metadata + conversation (readable)
+asv show <session-id> --full       # full event trace
+asv show <session-id> --json       # session + events as JSON
 asv export <session-id> --out ./out
 asv export --all --out ./out
 asv list --home /path/to/grok-home
@@ -52,7 +54,7 @@ swift run AgentSessionViewer
 
 Or open `Package.swift` in Xcode, select the **AgentSessionViewer** scheme, and Run.
 
-P0 ships discovery + session info; full conversation stream UI is P1.
+The Details column shows Session info and the full Conversation stream (Readable / Full trace). `asv show` prints the same.
 
 ## Layout
 

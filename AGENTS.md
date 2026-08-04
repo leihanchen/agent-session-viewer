@@ -83,10 +83,10 @@ Commands must remain discoverable via `asv --help` (overview + examples) and `as
 | `list` | Overview (default subcommand) |
 | `projects` | List projects |
 | `sessions [project-id]` | List sessions |
-| `show <session-id>` | Metadata + path |
+| `show <session-id>` | Metadata **+ full conversation** (Readable by default; `--full` for full trace) |
 | `export <id>\|--all` | Full-trace JSON into a directory |
 
-Common flags: `--home <path>`, `--json` (list/projects/sessions/show), `--out <dir>` (export).
+Common flags: `--home <path>`, `--json` (list/projects/sessions/show), `--full` (`show`), `--out <dir>` (export).
 
 Export = **one JSON file per session**, full event trace, fields at least: `schema_version`, `agent` (e.g. `"grok-build"`), session info, `events[]`. Bulk export = directory of files (not zip in v1).
 
@@ -98,10 +98,11 @@ Three columns (CC LOG–style, English):
 
 1. **Projects** — cwd groups  
 2. **Sessions** — title, dates, counts  
-3. **Details** — Session info + Detail stream  
+3. **Details** — Session info + **Conversation** (every message/event)  
 
 - **Session title:** summary → first user message → short id  
-- **Readable mode** (default) vs **Full trace** toggle (stream UI is P1+)  
+- **Readable mode** (default): coalesced turns; **Full trace** toolbar toggle: every event  
+- Load via `SessionTranscript.events(for:mode:)` from `updates.jsonl`  
 - Search v1: **metadata only** (path/title/id/date)  
 - Subagent sessions: **flat peers** (no nesting in v1)  
 - Snapshot load / Refresh only — no live file watching in v1  
@@ -128,9 +129,9 @@ Three columns (CC LOG–style, English):
 | Phase | Focus |
 |-------|--------|
 | **P0** | Core + `asv` + app shell + fixtures — **done** |
-| **P1** | Detail stream UI (Readable / Full trace) |
-| **P2** | Polish export in app UI |
-| **P3** | DMG packaging — `./scripts/package-dmg.sh` (app + top-level `asv` + in-app CLI) |
+| **P1** | Detail stream UI + `asv show` conversation — **done** |
+| **P2** | In-app export UI polish |
+| **P3** | DMG packaging — `./scripts/package-dmg.sh` — **done** |
 
 Install product rules: CLI installable **standalone**; DMG may **bundle** `asv` (ADR 0006).
 

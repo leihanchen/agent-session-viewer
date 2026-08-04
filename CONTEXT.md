@@ -39,17 +39,18 @@ The display name of a Session in lists. Prefer non-empty summary/title from the 
 _Avoid_: always using raw UUID as the only label
 
 **Detail stream**:
-The ordered sequence of Events for one Session shown in the Details column.
+The ordered sequence of Events for one Session shown in the Details column (Conversation). Loaded from the agent’s on-disk log (`updates.jsonl` for Grok Build).
 
 **Event**:
-A single item in the Detail stream: user message, assistant message, tool use, tool result, error, or similar agent-trace record. Normalized across agents at the Export bundle boundary.
-
-**Full trace**:
-Detail stream mode (and CLI export content) that includes every Event, including tool payloads, not only human-readable chat text.
-_Avoid_: debug dump, raw agent files (on-disk layout, not the normalized model)
+A single item in the Detail stream: user message, assistant message, thinking, tool use, tool result, error, or similar agent-trace record. Normalized across agents at the Export bundle boundary.
 
 **Readable mode**:
-UI Detail stream mode that emphasizes user/assistant text and collapses tool I/O behind chips/summaries. Toggleable to Full trace.
+Detail stream presentation that coalesces consecutive text chunks into turns and de-emphasizes noise; default for UI and `asv show`.
+_Avoid_: summary-only view (implies messages are omitted)
+
+**Full trace**:
+Detail stream that lists every normalized Event without coalescing (UI toggle / `asv show --full`). Export always uses full trace.
+_Avoid_: debug dump, raw agent files (on-disk layout, not the normalized model)
 
 **Export bundle**:
 A normalized portable JSON document for one Session: Session info plus the full Event trace. One file per Session. Agent-agnostic schema with an agent identifier field. Not a raw copy of any agent’s session directory.

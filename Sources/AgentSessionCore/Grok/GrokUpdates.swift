@@ -1,5 +1,6 @@
 import Foundation
 
+/// Grok Build `updates.jsonl` parser (internal to Core; use `SessionTranscript` from app/CLI).
 enum GrokUpdates {
     /// Scan `updates.jsonl` for the first user-visible message text.
     static func firstUserMessage(in url: URL) -> String? {
@@ -36,7 +37,7 @@ enum GrokUpdates {
     }
 
     /// Load normalized events from `updates.jsonl` (full file).
-    public static func loadEvents(sessionDirectory: URL) throws -> [SessionEvent] {
+    static func loadEvents(sessionDirectory: URL) throws -> [SessionEvent] {
         let url = sessionDirectory.appendingPathComponent("updates.jsonl")
         guard FileManager.default.fileExists(atPath: url.path) else {
             return []
@@ -67,7 +68,7 @@ enum GrokUpdates {
 
         let ts: Date?
         if let t = obj["timestamp"] as? Double {
-            // Grok timestamps in samples appear as large integers (ms or custom); treat as seconds if small, else ms.
+            // Grok timestamps: large values may be ms; normal unix seconds otherwise.
             if t > 1_000_000_000_000 {
                 ts = Date(timeIntervalSince1970: t / 1000.0)
             } else if t > 1_000_000_000 {
@@ -97,6 +98,7 @@ enum GrokUpdates {
         switch sessionUpdate {
         case "user_message_chunk":
             let text = textContent(update["content"])
+            guard let text, !text.isEmpty else { return nil }
             return SessionEvent(
                 id: eventId,
                 type: "user",
@@ -107,6 +109,7 @@ enum GrokUpdates {
             )
         case "agent_message_chunk":
             let text = textContent(update["content"])
+            guard let text, !text.isEmpty else { return nil }
             return SessionEvent(
                 id: eventId,
                 type: "assistant",
@@ -117,6 +120,7 @@ enum GrokUpdates {
             )
         case "agent_thought_chunk":
             let text = textContent(update["content"])
+            guard let text, !text.isEmpty else { return nil }
             return SessionEvent(
                 id: eventId,
                 type: "thinking",
@@ -126,34 +130,41 @@ enum GrokUpdates {
                 raw: raw
             )
         case "tool_call":
-            let name = (update["title"] as? String)
-                ?? ((update["_meta"] as? [String: Any])?["x.ai/tool"] as? [String: Any])?["name"] as? String
+            let name = toolName(from: update)
+            let inputSummary = stringifyJSON(update["rawInput"])
+            let contentParts = [name, inputSummary].compactMap { $0 }.filter { !$0.isEmpty }
             return SessionEvent(
                 id: eventId,
                 type: "tool_use",
                 timestamp: ts,
                 role: "assistant",
-                content: name,
+                content: contentParts.joined(separator: "\n"),
                 toolName: name,
                 toolCallId: update["toolCallId"] as? String,
                 raw: raw
             )
         case "tool_call_update":
-            let name = update["title"] as? String
+            let name = toolName(from: update)
             let status = update["status"] as? String
             let isError = status == "failed" || status == "error"
+            let body = toolResultBody(from: update)
+            var lines: [String] = []
+            if let name, !name.isEmpty { lines.append(name) }
+            if let status, !status.isEmpty { lines.append("status: \(status)") }
+            if let body, !body.isEmpty { lines.append(body) }
             return SessionEvent(
                 id: eventId,
                 type: "tool_result",
                 timestamp: ts,
                 role: "tool",
-                content: name,
+                content: lines.isEmpty ? name : lines.joined(separator: "\n"),
                 toolName: name,
                 toolCallId: update["toolCallId"] as? String,
                 isError: isError,
                 raw: raw
             )
         default:
+            // Keep other update kinds for full-trace completeness.
             return SessionEvent(
                 id: eventId,
                 type: sessionUpdate,
@@ -164,9 +175,65 @@ enum GrokUpdates {
         }
     }
 
+    private static func toolName(from update: [String: Any]) -> String? {
+        if let title = update["title"] as? String, !title.isEmpty {
+            return title
+        }
+        if let meta = update["_meta"] as? [String: Any],
+           let tool = meta["x.ai/tool"] as? [String: Any],
+           let name = tool["name"] as? String
+        {
+            return name
+        }
+        return nil
+    }
+
     private static func textContent(_ value: Any?) -> String? {
-        guard let content = value as? [String: Any] else { return nil }
-        return content["text"] as? String
+        if let content = value as? [String: Any], let t = content["text"] as? String {
+            return t
+        }
+        if let s = value as? String {
+            return s
+        }
+        return nil
+    }
+
+    /// Extract printable tool result body from Grok tool_call_update shapes.
+    private static func toolResultBody(from update: [String: Any]) -> String? {
+        if let content = update["content"] as? [[String: Any]] {
+            var parts: [String] = []
+            for item in content {
+                if let inner = item["content"] as? [String: Any], let t = inner["text"] as? String {
+                    parts.append(t)
+                } else if let t = item["text"] as? String {
+                    parts.append(t)
+                } else if let t = textContent(item["content"]) {
+                    parts.append(t)
+                }
+            }
+            if !parts.isEmpty {
+                return parts.joined(separator: "\n")
+            }
+        }
+        if let t = textContent(update["content"]) {
+            return t
+        }
+        if let out = update["rawOutput"] {
+            return stringifyJSON(out)
+        }
+        return nil
+    }
+
+    private static func stringifyJSON(_ value: Any?) -> String? {
+        guard let value else { return nil }
+        if let s = value as? String { return s }
+        guard JSONSerialization.isValidJSONObject(value),
+              let data = try? JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .sortedKeys]),
+              let text = String(data: data, encoding: .utf8)
+        else {
+            return String(describing: value)
+        }
+        return text
     }
 }
 

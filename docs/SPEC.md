@@ -1,6 +1,6 @@
 # Agent Session Viewer — Product Spec (v1)
 
-**Status:** P0 scaffold complete (Core + `asv` + SwiftUI shell + fixtures). P1 = detail stream UI.  
+**Status:** P0 + P1 complete — Core, `asv` (including conversation `show`), SwiftUI Detail stream (Readable / Full trace), export, DMG packaging.  
 **Repo:** `/Users/mac/Documents/github_repo/agent-session-viewer`  
 **UI language:** English only  
 **Related:** `CONTEXT.md`, `docs/adr/0001`–`0006`
@@ -93,9 +93,9 @@
 | U2 | **Projects:** show project label (folder basename and/or path), session count, last updated when known. |
 | U3 | **Sessions:** show Session title, timestamps, message/tool counts when available. |
 | U4 | **Session title** resolution: non-empty summary → truncated first user message → short session id. |
-| U5 | **Details:** chronological Event list; timestamps; role labels (User / Assistant / tool). |
-| U6 | **Readable mode (default):** user/assistant text prominent; tools as collapsible chips/summaries. |
-| U7 | **Full trace mode:** toggle shows full Event payloads (tool args/results, errors, thinking if present). |
+| U5 | **Details:** Session info card **plus** chronological Conversation Event list (user, assistant, thinking, tool_use, tool_result) with timestamps and role labels. |
+| U6 | **Readable mode (default):** consecutive text chunks coalesced into turns; long bodies collapsible (“Show more”); hook/noise types hidden. |
+| U7 | **Full trace mode:** toolbar toggle shows every normalized Event including thinking and tool args/results. |
 | U8 | Header chrome: product name, Data root path, Refresh control; optional index/session counts. |
 | U9 | Search/filter v1: **metadata only** — Projects by path/name; Sessions by title/id/date. No body full-text. |
 | U10 | Subagent Sessions listed as **flat peers** under the Project. |
@@ -153,7 +153,7 @@
 | | `asv list` — overview (projects + session counts) |
 | | `asv projects` — list Projects |
 | | `asv sessions [project]` — list Sessions (optional project filter) |
-| | `asv show <session-id>` — metadata + on-disk path |
+| | `asv show <session-id> [--full] [--json]` — metadata + full conversation (readable default; `--full` = full trace) |
 | | `asv export <session-id\|--all> [--out <dir>] [--home <path>]` — full-trace Export bundles |
 | C3 | Global/common flags: `--home <path>` (Data root override), stable machine-readable output where useful (`--json` on list/show optional but recommended). |
 | C4 | Exit non-zero on missing paths, unknown session ids, and write failures; print clear errors to stderr. |
@@ -236,13 +236,13 @@ agent-session-viewer/
 
 ## 11. Phased delivery
 
-| Phase | Deliverable |
-|-------|-------------|
-| **P0** | SPM/Xcode skeleton: Core + `asv` + empty SwiftUI app; fixtures; `asv projects` / `asv sessions` against `~/.grok` or fixtures. |
-| **P1** | Full Detail stream parser + Readable/Full trace UI + Session info. |
-| **P2** | Export (single + bulk directory) in CLI and app. |
-| **P3** | DMG packaging with bundled `asv` + docs for CLI-only install path. |
-| **Later** | Full-text search; live refresh; second Agent adapter; zip export; nested subagents. |
+| Phase | Deliverable | Status |
+|-------|-------------|--------|
+| **P0** | Core + `asv` list/projects/sessions + app shell + fixtures | Done |
+| **P1** | Detail stream: UI Conversation + `asv show` prints all messages; Readable / Full trace | Done |
+| **P2** | Export CLI + core export API (app export button optional polish) | Mostly done (CLI export) |
+| **P3** | DMG packaging with bundled `asv` + CLI-only install | Done (`scripts/package-dmg.sh`) |
+| **Later** | Full-text search; live refresh; second Agent adapter; zip export; nested subagents; in-app export UI | |
 
 ---
 
