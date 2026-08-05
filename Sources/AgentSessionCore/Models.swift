@@ -4,6 +4,7 @@ import Foundation
 public enum AgentKind: String, Sendable, Codable, Equatable, CaseIterable, Identifiable {
     case grokBuild = "grok-build"
     case claudeCode = "claude-code"
+    case codex = "codex"
 
     public var id: String { rawValue }
 
@@ -11,6 +12,7 @@ public enum AgentKind: String, Sendable, Codable, Equatable, CaseIterable, Ident
         switch self {
         case .grokBuild: return "Grok Build"
         case .claudeCode: return "Claude Code"
+        case .codex: return "Codex"
         }
     }
 }

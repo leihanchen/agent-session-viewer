@@ -19,9 +19,9 @@ struct ASV: ParsableCommand {
           export <id>|--all     Write full-trace JSON file(s) into a directory
 
         GLOBAL OPTIONS (most commands)
-          --agent <name>        grok-build (default) | claude-code
+          --agent <name>        grok-build (default) | claude-code | codex
           --home <path>         Agent data root override
-                                (Grok: $GROK_HOME|~/.grok; Claude: $CLAUDE_CONFIG_DIR|~/.claude)
+                                (Grok: ~/.grok; Claude: ~/.claude; Codex: ~/.codex)
           --json                Machine-readable JSON on stdout (list/projects/sessions/show)
           -h, --help            Show help for asv or a subcommand
           --version             Print version
@@ -29,12 +29,13 @@ struct ASV: ParsableCommand {
         USAGE EXAMPLES
           asv list
           asv list --agent claude-code
+          asv list --agent codex
           asv list --home ~/.grok --json
           asv projects --agent claude-code
-          asv sessions
           asv show 019f623a-a8d1-7591-beff-c41fc716b171
           asv show <claude-session-id> --agent claude-code
-          asv export --all --agent claude-code --out ./out
+          asv show <codex-session-id> --agent codex
+          asv export --all --agent codex --out ./out
 
         GETTING HELP FOR ONE COMMAND
           asv list --help
@@ -61,7 +62,7 @@ struct HomeOptions: ParsableArguments {
         name: .long,
         help: ArgumentHelp(
             "Agent to browse.",
-            discussion: "grok-build (default) or claude-code."
+            discussion: "grok-build (default), claude-code, or codex."
         )
     )
     var agent: String = AgentKind.grokBuild.rawValue
@@ -70,14 +71,14 @@ struct HomeOptions: ParsableArguments {
         name: .long,
         help: ArgumentHelp(
             "Data root directory override.",
-            discussion: "Grok: $GROK_HOME or ~/.grok. Claude: $CLAUDE_CONFIG_DIR / $CLAUDE_HOME or ~/.claude."
+            discussion: "Grok: $GROK_HOME|~/.grok. Claude: $CLAUDE_CONFIG_DIR|$CLAUDE_HOME|~/.claude. Codex: $CODEX_HOME|~/.codex."
         )
     )
     var home: String?
 
     func resolvedAgent() throws -> AgentKind {
         guard let kind = AgentKind(rawValue: agent) else {
-            throw ValidationError("Unknown agent '\(agent)'. Use: grok-build, claude-code")
+            throw ValidationError("Unknown agent '\(agent)'. Use: grok-build, claude-code, codex")
         }
         return kind
     }

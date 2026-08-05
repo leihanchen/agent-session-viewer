@@ -18,6 +18,8 @@ public enum AgentStoreFactory {
             return GrokCatalog(homeOverride: homeOverride)
         case .claudeCode:
             return ClaudeCatalog(homeOverride: homeOverride)
+        case .codex:
+            return CodexCatalog(homeOverride: homeOverride)
         }
     }
 }

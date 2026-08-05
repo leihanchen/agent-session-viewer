@@ -15,7 +15,7 @@ Instructions for AI coding agents working in **this repository**. Keep changes a
 | Shared library | `AgentSessionCore` |
 
 - **English UI only**
-- **Agent stores:** Grok Build (`~/.grok`) and Claude Code (`~/.claude`); toolbar picker + CLI `--agent`
+- **Agent stores:** Grok Build (`~/.grok`), Claude Code (`~/.claude`), Codex (`~/.codex`); toolbar picker + CLI `--agent`
 - **Future agents:** add `AgentSessionStore` under `Sources/AgentSessionCore/<Agent>/`
 - **Not:** a website, WebView app, cloud service, or session editor
 
@@ -102,9 +102,9 @@ Commands must remain discoverable via `asv --help` (overview + examples) and `as
 | `show <session-id>` | Metadata **+ full conversation** (Readable by default; `--full` for full trace) |
 | `export <id>\|--all` | Full-trace JSON into a directory |
 
-Common flags: `--agent grok-build|claude-code` (default `grok-build`), `--home <path>`, `--json` (list/projects/sessions/show), `--full` (`show`), `--out <dir>` (export).
+Common flags: `--agent grok-build|claude-code|codex` (default `grok-build`), `--home <path>`, `--json` (list/projects/sessions/show), `--full` (`show`), `--out <dir>` (export).
 
-Export = **one JSON file per session**, full event trace, fields at least: `schema_version`, `agent` (`grok-build` or `claude-code`), session info, `events[]`. Bulk export = directory of files (not zip in v1). One agent per command (no cross-agent list).
+Export = **one JSON file per session**, full event trace, fields at least: `schema_version`, `agent` (`grok-build` / `claude-code` / `codex`), session info, `events[]`. Bulk export = directory of files (not zip in v1). One agent per command (no cross-agent list).
 
 ---
 
@@ -119,7 +119,7 @@ Three columns (CC LOG–style, English):
 - **Session title:** summary → first user message → short id  
 - **Readable mode** (default): coalesced turns; **Full trace** toolbar toggle: every event  
 - Load via `SessionTranscript.events(for:mode:)` from `updates.jsonl`  
-- **Agent picker** (toolbar): Grok Build | Claude Code — reloads that agent’s data root only  
+- **Agent picker** (toolbar): Grok Build | Claude Code | Codex — reloads that agent’s data root only  
 - **One search field only:** “Search all conversations…” — full-text across every session **of the selected agent** (debounced). Results sorted by match count then `updatedAt`; highlight in snippets + detail. Empty query lists all sessions for that agent.
 - Subagent sessions: **flat peers** (no nesting in v1)  
 - Snapshot load / Refresh only — no live file watching in v1  
@@ -150,7 +150,20 @@ Three columns (CC LOG–style, English):
 - Adapter: `ClaudeCatalog` / `ClaudeTranscript`
 - Do not depend on third-party indexes (e.g. `cc-log.sqlite`)
 
-Both implement `AgentSessionStore` via `AgentStoreFactory`. 
+### Codex
+
+```
+<data-root>/sessions/YYYY/MM/DD/rollout-<timestamp>-<session-uuid>.jsonl
+<data-root>/session_index.jsonl   # optional titles
+```
+
+- Default: `$CODEX_HOME` or `~/.codex`
+- Discover by scanning rollouts; use `session_index` for `thread_name` titles when present
+- Group projects by `session_meta.cwd`
+- Adapter: `CodexCatalog` / `CodexTranscript`
+- Do not require SQLite logs for MVP
+
+All implement `AgentSessionStore` via `AgentStoreFactory`. 
 
 ---
 
@@ -185,7 +198,7 @@ Install product rules (ADR 0006):
 
 ## Out of scope (v1)
 
-Writing/deleting agent session files · live tail · zip bulk export · App Sandbox / Mac App Store · nested subagent UI · Cursor/Codex adapters · cross-agent search · web frontend
+Writing/deleting agent session files · live tail · zip bulk export · App Sandbox / Mac App Store · nested subagent UI · Cursor adapter · cross-agent search · web frontend
 
 ---
 

@@ -26,6 +26,11 @@ public enum DataRoot {
                 return URL(fileURLWithPath: (home as NSString).expandingTildeInPath, isDirectory: true)
             }
             return fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".claude", isDirectory: true)
+        case .codex:
+            if let home = environment["CODEX_HOME"], !home.isEmpty {
+                return URL(fileURLWithPath: (home as NSString).expandingTildeInPath, isDirectory: true)
+            }
+            return fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".codex", isDirectory: true)
         }
     }
 
@@ -44,5 +49,9 @@ public enum DataRoot {
 
     public static func claudeProjectsDirectory(dataRoot: URL) -> URL {
         dataRoot.appendingPathComponent("projects", isDirectory: true)
+    }
+
+    public static func codexSessionsDirectory(dataRoot: URL) -> URL {
+        dataRoot.appendingPathComponent("sessions", isDirectory: true)
     }
 }

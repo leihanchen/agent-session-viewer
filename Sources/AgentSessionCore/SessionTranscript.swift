@@ -24,6 +24,9 @@ public enum SessionTranscript {
         case .claudeCode:
             let file = URL(fileURLWithPath: session.directoryPath)
             return try ClaudeTranscript.loadEventsExpanded(from: file)
+        case .codex:
+            let file = URL(fileURLWithPath: session.directoryPath)
+            return try CodexTranscript.loadEvents(from: file)
         }
     }
 

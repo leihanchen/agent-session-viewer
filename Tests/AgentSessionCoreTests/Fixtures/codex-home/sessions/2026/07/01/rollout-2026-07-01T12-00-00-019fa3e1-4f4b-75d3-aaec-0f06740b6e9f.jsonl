@@ -1,0 +1,6 @@
+{"timestamp": "2026-07-01T12:00:00.000Z", "type": "session_meta", "payload": {"session_id": "019fa3e1-4f4b-75d3-aaec-0f06740b6e9f", "id": "019fa3e1-4f4b-75d3-aaec-0f06740b6e9f", "cwd": "/Users/demo/codex-proj", "originator": "codex_cli", "model_provider": "openai"}}
+{"timestamp": "2026-07-01T12:00:01.000Z", "type": "response_item", "payload": {"type": "message", "id": "msg-u1", "role": "user", "content": [{"type": "input_text", "text": "Please fix the Codex rollout parser"}]}}
+{"timestamp": "2026-07-01T12:00:02.000Z", "type": "response_item", "payload": {"type": "message", "id": "msg-a1", "role": "assistant", "content": [{"type": "output_text", "text": "I will inspect the parser tests."}]}}
+{"timestamp": "2026-07-01T12:00:03.000Z", "type": "response_item", "payload": {"type": "function_call", "id": "fc1", "name": "read_file", "arguments": "{\"path\": \"/Users/demo/codex-proj/main.swift\"}", "call_id": "call-1"}}
+{"timestamp": "2026-07-01T12:00:04.000Z", "type": "response_item", "payload": {"type": "function_call_output", "id": "fco1", "call_id": "call-1", "output": [{"type": "input_text", "text": "print(\"ok\")"}]}}
+{"timestamp": "2026-07-01T12:00:05.000Z", "type": "turn_context", "payload": {"cwd": "/Users/demo/codex-proj", "model": "gpt-5"}}

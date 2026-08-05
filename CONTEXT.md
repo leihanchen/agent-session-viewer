@@ -13,7 +13,7 @@ The companion command-line binary for listing and exporting sessions without ope
 _Avoid_: gsv
 
 **Agent**:
-A coding-agent product whose on-disk sessions Agent Session Viewer can read. Supported: Grok Build, Claude Code. Domain model stays agent-agnostic where practical.
+A coding-agent product whose on-disk sessions Agent Session Viewer can read. Supported: Grok Build, Claude Code, Codex. Domain model stays agent-agnostic where practical.
 _Avoid_: model (use for LLM id), provider (too vague)
 
 **Agent picker**:
@@ -27,11 +27,15 @@ _Avoid_: server, cloud, remote data root
 The root directory of Claude Code’s on-disk state. Defaults to `~/.claude`, or `$CLAUDE_CONFIG_DIR` / `$CLAUDE_HOME` when set.
 _Avoid_: Claude.ai web history, Anthropic cloud
 
+**Codex home**:
+The root directory of OpenAI Codex’s on-disk state. Defaults to `~/.codex`, or `$CODEX_HOME` when set.
+_Avoid_: ChatGPT web history
+
 **Data root**:
-The configured on-disk root for the selected Agent (Grok home or Claude home).
+The configured on-disk root for the selected Agent (Grok, Claude, or Codex home).
 
 **Project**:
-A working-directory group under a Data root that owns zero or more Sessions (Grok: encoded cwd under `sessions/`; Claude: folder under `projects/`).
+A working-directory group under a Data root that owns zero or more Sessions (Grok: encoded cwd under `sessions/`; Claude: folder under `projects/`; Codex: grouped by session `cwd`).
 _Avoid_: repository (unless referring to git metadata on a session), workspace (ambiguous with editor workspaces)
 
 **Session**:

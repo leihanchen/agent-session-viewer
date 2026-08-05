@@ -11,7 +11,7 @@
 
 **Agent Session Viewer** is a local, read-only macOS app that visualizes coding-agent sessions on disk in a three-column UI (Projects → Sessions → Details), with a companion CLI **`asv`** for list/export.
 
-- **Agents:** Grok Build (`~/.grok`) and Claude Code (`~/.claude`), selected via toolbar / CLI `--agent`.
+- **Agents:** Grok Build (`~/.grok`), Claude Code (`~/.claude`), and Codex (`~/.codex`), selected via toolbar / CLI `--agent`.
 - **Future:** more Agents behind the same UI and Export bundle schema.
 - **Not:** a website, cloud service, WebView shell, or session editor.
 

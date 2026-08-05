@@ -1,3 +1,3 @@
 # Multi-agent via AgentSessionStore adapters
 
-Agent Session Viewer supports multiple coding agents (Grok Build, Claude Code) with one UI and CLI. Each agent implements `AgentSessionStore` (list projects/sessions, load events) under an agent-specific on-disk layout. The toolbar agent picker (and CLI `--agent`) selects which store is active; search and export operate on that agent only. Normalized `SessionEvent` / export schema stay agent-agnostic (`agent` field distinguishes sources).
+Agent Session Viewer supports multiple coding agents (Grok Build, Claude Code, Codex) with one UI and CLI. Each agent implements `AgentSessionStore` (list projects/sessions, load events) under an agent-specific on-disk layout. The toolbar agent picker (and CLI `--agent`) selects which store is active; search and export operate on that agent only. Normalized `SessionEvent` / export schema stay agent-agnostic (`agent` field distinguishes sources).

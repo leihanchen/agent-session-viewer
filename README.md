@@ -4,7 +4,7 @@ Local, read-only **macOS** browser for coding-agent sessions, with companion CLI
 
 | | |
 |--|--|
-| **Agents** | **Grok Build** and **Claude Code** (toolbar picker / CLI `--agent`) |
+| **Agents** | **Grok Build**, **Claude Code**, and **Codex** (toolbar picker / CLI `--agent`) |
 | **UI** | SwiftUI three-column browser (Projects → Sessions → Conversation) |
 | **CLI** | `list` / `projects` / `sessions` / `show` / `export` |
 
@@ -20,10 +20,11 @@ See [docs/SPEC.md](docs/SPEC.md) (requirements), [AGENTS.md](AGENTS.md) (coding-
 |--------|-----------------|-------------------|--------------|
 | **Grok Build** | `grok-build` | `~/.grok` | `$GROK_HOME` |
 | **Claude Code** | `claude-code` | `~/.claude` | `$CLAUDE_CONFIG_DIR` or `$CLAUDE_HOME` |
+| **Codex** | `codex` | `~/.codex` | `$CODEX_HOME` |
 
 - **App:** segmented control in the toolbar selects the active agent; projects, sessions, conversation, and search apply to **that agent only**.
-- **CLI:** pass `--agent grok-build` (default) or `--agent claude-code` on each command. Optional `--home <path>` overrides that agent’s data root.
-- On-disk layouts differ (Grok: `sessions/<encoded-cwd>/<id>/`; Claude: `projects/<encoded-cwd>/<id>.jsonl`). Both normalize into the same UI/export model. See [ADR 0007](docs/adr/0007-multi-agent-session-stores.md).
+- **CLI:** pass `--agent grok-build` (default), `claude-code`, or `codex`. Optional `--home <path>` overrides that agent’s data root.
+- On-disk layouts differ (Grok: `sessions/<cwd>/<id>/`; Claude: `projects/<cwd>/<id>.jsonl`; Codex: `sessions/YYYY/MM/DD/rollout-*-<id>.jsonl`). All normalize into the same UI/export model. See [ADR 0007](docs/adr/0007-multi-agent-session-stores.md).
 
 ## Requirements
 
@@ -64,26 +65,30 @@ asv export --all --out ./out
 
 # Claude Code
 asv list --agent claude-code
-asv projects --agent claude-code
-asv sessions --agent claude-code
 asv show <session-id> --agent claude-code
 asv export --all --agent claude-code --out ./out
 
+# Codex
+asv list --agent codex
+asv sessions --agent codex
+asv show <session-id> --agent codex
+asv export --all --agent codex --out ./out
+
 # Overrides
 asv list --home /path/to/grok-home
-asv list --agent claude-code --home /path/to/claude-home
+asv list --agent codex --home /path/to/codex-home
 asv projects --json
 asv show <session-id> --json
 ```
 
 | Flag | Meaning |
 |------|---------|
-| `--agent` | `grok-build` (default) or `claude-code` |
+| `--agent` | `grok-build` (default), `claude-code`, or `codex` |
 | `--home` | Override data root for that agent |
 | `--json` | Machine-readable output (`list` / `projects` / `sessions` / `show`) |
 | `--full` | Full event trace on `show` (default is readable/coalesced) |
 
-Export JSON includes `"agent": "grok-build"` or `"agent": "claude-code"`.
+Export JSON includes `"agent": "grok-build"`, `"claude-code"`, or `"codex"`.
 
 ## macOS app (dev)
 
@@ -95,7 +100,7 @@ Or open `Package.swift` in Xcode, select the **AgentSessionViewer** scheme, and 
 
 ### UI notes
 
-- Toolbar: **Grok Build | Claude Code**, data root path, Readable / Full trace, Refresh.
+- Toolbar: **Grok Build | Claude Code | Codex**, data root path, Readable / Full trace, Refresh.
 - Search field: **Search all conversations…** — full-text over **every session of the selected agent** (not across agents). Empty query lists all sessions for that agent.
 - Details: Session info + conversation stream; matches highlight when searching.
 
@@ -106,6 +111,7 @@ Sources/AgentSessionCore/
   Agent/                 # AgentSessionStore protocol + factory
   Grok/                  # Grok Build adapter
   Claude/                # Claude Code adapter
+  Codex/                 # OpenAI Codex adapter
   Search/                # Conversation search
   Export/
 Sources/asv/             # CLI
@@ -113,6 +119,7 @@ Sources/AgentSessionViewer/
 Tests/AgentSessionCoreTests/Fixtures/
   grok-home/
   claude-home/
+  codex-home/
 docs/SPEC.md
 docs/adr/
 CONTEXT.md

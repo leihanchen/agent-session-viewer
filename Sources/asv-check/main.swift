@@ -148,6 +148,41 @@ struct ASVCheck {
             failures += 1
         }
 
+        // Codex fixture
+        let codexHome = fixtureCodexHome()
+        expect(FileManager.default.fileExists(atPath: codexHome.path), "codex fixture exists")
+        do {
+            let store = CodexCatalog(dataRoot: codexHome)
+            expect(store.agent == .codex, "codex agent kind")
+            let projects = try store.listProjects()
+            expect(projects.count == 1, "codex 1 project (got \(projects.count))")
+            let sessions = try store.listSessions(projectId: nil)
+            expect(sessions.count == 1, "codex 1 session")
+            let sid = "019fa3e1-4f4b-75d3-aaec-0f06740b6e9f"
+            let s = try store.session(id: sid)
+            expect(s.title == "Codex fixture demo", "codex title from index")
+            expect(s.agent == .codex, "session agent codex")
+            expect(s.projectPath == "/Users/demo/codex-proj", "codex cwd")
+            let events = try store.loadEvents(session: s)
+            expect(events.contains(where: { $0.type == "user" }), "codex has user")
+            expect(events.contains(where: { $0.type == "assistant" }), "codex has assistant")
+            expect(events.contains(where: { $0.type == "tool_use" }), "codex has tool_use")
+            expect(events.contains(where: { $0.type == "tool_result" }), "codex has tool_result")
+            let hits = ConversationSearch.search(sessions: sessions, query: "rollout parser") {
+                try store.loadEvents(session: $0)
+            }
+            expect(hits.count == 1, "codex search hit")
+            let exportURL = try SessionExporter.exportSession(
+                session: s,
+                to: FileManager.default.temporaryDirectory.appendingPathComponent("asv-cx-\(UUID().uuidString)", isDirectory: true)
+            )
+            let obj = try JSONSerialization.jsonObject(with: Data(contentsOf: exportURL)) as? [String: Any]
+            expect(obj?["agent"] as? String == "codex", "export agent codex")
+        } catch {
+            fputs("FAIL: codex catalog threw \(error)\n", stderr)
+            failures += 1
+        }
+
         if failures > 0 {
             fputs("\n\(failures) failure(s)\n", stderr)
             exit(1)
@@ -162,6 +197,10 @@ struct ASVCheck {
 
     static func fixtureClaudeHome() -> URL {
         fixturesRoot().appendingPathComponent("claude-home", isDirectory: true)
+    }
+
+    static func fixtureCodexHome() -> URL {
+        fixturesRoot().appendingPathComponent("codex-home", isDirectory: true)
     }
 
     static func fixturesRoot() -> URL {
