@@ -1,8 +1,18 @@
 import Foundation
 
 /// Coding-agent identifier used in exports and catalogs.
-public enum AgentKind: String, Sendable, Codable, Equatable {
+public enum AgentKind: String, Sendable, Codable, Equatable, CaseIterable, Identifiable {
     case grokBuild = "grok-build"
+    case claudeCode = "claude-code"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .grokBuild: return "Grok Build"
+        case .claudeCode: return "Claude Code"
+        }
+    }
 }
 
 /// A working-directory group that owns zero or more sessions.

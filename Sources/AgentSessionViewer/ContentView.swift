@@ -17,12 +17,25 @@ struct ContentView: View {
         .navigationTitle("Agent Session Viewer")
         .toolbar {
             ToolbarItem(placement: .automatic) {
-                Text(model.dataRootPath)
+                Picker("Agent", selection: $model.selectedAgent) {
+                    ForEach(AgentKind.allCases) { agent in
+                        Text(agent.displayName).tag(agent)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 260)
+                .onChange(of: model.selectedAgent) { _, _ in
+                    model.switchAgent()
+                }
+                .help("Select which coding agent’s sessions to browse")
+            }
+            ToolbarItem(placement: .automatic) {
+                Text("\(model.selectedAgent.displayName) · \(model.dataRootPath)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                    .frame(maxWidth: 360)
+                    .frame(maxWidth: 420)
             }
             ToolbarItem(placement: .automatic) {
                 Picker("View mode", selection: $model.detailMode) {
@@ -448,6 +461,13 @@ private struct EventRowView: View {
 
 @MainActor
 final class AppModel: ObservableObject {
+    private static let agentDefaultsKey = "asv.selectedAgent"
+
+    @Published var selectedAgent: AgentKind {
+        didSet {
+            UserDefaults.standard.set(selectedAgent.rawValue, forKey: Self.agentDefaultsKey)
+        }
+    }
     @Published var projects: [Project] = []
     @Published var sessions: [SessionInfo] = []
     @Published var selectedProjectId: Project.ID?
@@ -460,12 +480,30 @@ final class AppModel: ObservableObject {
     @Published var isLoadingEvents = false
     @Published var eventsError: String?
 
-    /// Single toolbar search: full-text over every session conversation.
+    /// Single toolbar search: full-text over every session conversation (current agent only).
     @Published var conversationQuery: String = ""
     @Published var searchResults: [ConversationSearchHit] = []
     @Published var isSearching = false
 
+    private var store: any AgentSessionStore
     private var searchTask: Task<Void, Never>?
+
+    init() {
+        let raw = UserDefaults.standard.string(forKey: Self.agentDefaultsKey)
+        let agent = raw.flatMap(AgentKind.init(rawValue:)) ?? .grokBuild
+        self.selectedAgent = agent
+        self.store = AgentStoreFactory.make(agent: agent)
+    }
+
+    func switchAgent() {
+        store = AgentStoreFactory.make(agent: selectedAgent)
+        selectedProjectId = nil
+        selectedSessionId = nil
+        conversationQuery = ""
+        searchResults = []
+        events = []
+        refresh()
+    }
 
     var trimmedQuery: String {
         conversationQuery.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -512,11 +550,12 @@ final class AppModel: ObservableObject {
 
     func refresh() {
         errorMessage = nil
+        // Rebuild store in case defaults/home changed for the same agent.
+        store = AgentStoreFactory.make(agent: selectedAgent)
         do {
-            let catalog = GrokCatalog()
-            dataRootPath = catalog.dataRoot.path
-            projects = try catalog.listProjects()
-            sessions = try catalog.listSessions()
+            dataRootPath = store.dataRoot.path
+            projects = try store.listProjects()
+            sessions = try store.listSessions(projectId: nil)
             if let selectedProjectId, !projects.contains(where: { $0.id == selectedProjectId }) {
                 self.selectedProjectId = nil
                 self.selectedSessionId = nil
@@ -547,7 +586,8 @@ final class AppModel: ObservableObject {
         isLoadingEvents = true
         eventsError = nil
         do {
-            events = try SessionTranscript.events(for: session, mode: detailMode)
+            let raw = try store.loadEvents(session: session)
+            events = detailMode == .fullTrace ? raw : SessionTranscript.coalesceForReadable(raw)
         } catch {
             events = []
             eventsError = error.localizedDescription
@@ -566,6 +606,7 @@ final class AppModel: ObservableObject {
 
         isSearching = true
         let snapshot = sessions
+        let agent = selectedAgent
         let delayNs: UInt64 = immediate ? 0 : 300_000_000
 
         searchTask = Task { [weak self] in
@@ -576,18 +617,19 @@ final class AppModel: ObservableObject {
 
             let hits = await Task.detached(priority: .userInitiated) {
                 ConversationSearch.search(sessions: snapshot, query: q) { session in
+                    // Load via SessionTranscript so Grok/Claude dispatch works off-main.
                     try SessionTranscript.loadEvents(session: session)
                 }
             }.value
+            _ = agent
 
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard let self else { return }
-                // Drop stale results if the query changed while we scanned.
-                guard self.trimmedQuery == q else { return }
+                // Drop stale results if the query or agent changed while we scanned.
+                guard self.trimmedQuery == q, self.selectedAgent == agent else { return }
                 self.searchResults = hits
                 self.isSearching = false
-                // Keep selection if still in results; otherwise select first hit.
                 if let sel = self.selectedSessionId, hits.contains(where: { $0.session.id == sel }) {
                     self.reloadEvents()
                 } else if let first = hits.first {

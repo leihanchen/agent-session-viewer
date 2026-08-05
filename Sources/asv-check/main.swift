@@ -114,6 +114,40 @@ struct ASVCheck {
             failures += 1
         }
 
+        // Claude Code fixture
+        let claudeHome = fixtureClaudeHome()
+        expect(FileManager.default.fileExists(atPath: claudeHome.path), "claude fixture exists")
+        do {
+            let store = ClaudeCatalog(dataRoot: claudeHome)
+            expect(store.agent == .claudeCode, "claude agent kind")
+            let projects = try store.listProjects()
+            expect(projects.count == 1, "claude 1 project (got \(projects.count))")
+            let sessions = try store.listSessions(projectId: nil)
+            expect(sessions.count == 1, "claude 1 session")
+            let s = try store.session(id: "sess-cc-1111-1111-1111-111111111111")
+            expect(s.title == "Claude fixture hello world", "claude title from ai-title")
+            expect(s.agent == .claudeCode, "session agent claude-code")
+            expect(s.projectPath == "/Users/demo/proj", "claude cwd from jsonl")
+            let events = try store.loadEvents(session: s)
+            expect(events.contains(where: { $0.type == "user" }), "claude has user")
+            expect(events.contains(where: { $0.type == "assistant" }), "claude has assistant")
+            expect(events.contains(where: { $0.type == "tool_use" }), "claude has tool_use")
+            expect(events.contains(where: { $0.type == "tool_result" }), "claude has tool_result")
+            let hits = ConversationSearch.search(sessions: sessions, query: "Claude integration") {
+                try store.loadEvents(session: $0)
+            }
+            expect(hits.count == 1, "claude search hit")
+            let exportURL = try SessionExporter.exportSession(
+                session: s,
+                to: FileManager.default.temporaryDirectory.appendingPathComponent("asv-cc-\(UUID().uuidString)", isDirectory: true)
+            )
+            let obj = try JSONSerialization.jsonObject(with: Data(contentsOf: exportURL)) as? [String: Any]
+            expect(obj?["agent"] as? String == "claude-code", "export agent claude-code")
+        } catch {
+            fputs("FAIL: claude catalog threw \(error)\n", stderr)
+            failures += 1
+        }
+
         if failures > 0 {
             fputs("\n\(failures) failure(s)\n", stderr)
             exit(1)
@@ -123,10 +157,17 @@ struct ASVCheck {
 
     /// Resolve Fixtures/grok-home relative to the package (works from `swift run`).
     static func fixtureGrokHome() -> URL {
+        fixturesRoot().appendingPathComponent("grok-home", isDirectory: true)
+    }
+
+    static func fixtureClaudeHome() -> URL {
+        fixturesRoot().appendingPathComponent("claude-home", isDirectory: true)
+    }
+
+    static func fixturesRoot() -> URL {
         // #filePath = .../Sources/asv-check/main.swift
         let sources = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         let root = sources.deletingLastPathComponent().deletingLastPathComponent()
-        return root
-            .appendingPathComponent("Tests/AgentSessionCoreTests/Fixtures/grok-home", isDirectory: true)
+        return root.appendingPathComponent("Tests/AgentSessionCoreTests/Fixtures", isDirectory: true)
     }
 }

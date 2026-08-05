@@ -1,6 +1,6 @@
 # Agent Session Viewer
 
-A local, read-only macOS application (with companion CLI) for browsing and exporting coding-agent sessions stored on disk. English UI only. v1 focuses on Grok Build sessions; the product is named and structured so additional agents can be added later.
+A local, read-only macOS application (with companion CLI) for browsing and exporting coding-agent sessions stored on disk. English UI only. Supports Grok Build and Claude Code via an agent picker.
 
 ## Language
 
@@ -13,18 +13,25 @@ The companion command-line binary for listing and exporting sessions without ope
 _Avoid_: gsv
 
 **Agent**:
-A coding-agent product whose on-disk sessions Agent Session Viewer can read. v1 supports Grok Build only; the domain model stays agent-agnostic where practical.
+A coding-agent product whose on-disk sessions Agent Session Viewer can read. Supported: Grok Build, Claude Code. Domain model stays agent-agnostic where practical.
 _Avoid_: model (use for LLM id), provider (too vague)
 
+**Agent picker**:
+Toolbar control that selects the active Agent; browse, search, and export apply to that Agent only.
+
 **Grok home**:
-The root directory of Grok Build’s on-disk state. Defaults to `~/.grok`, or `$GROK_HOME` when set; the user may override the path in the app or CLI. Not a network service.
+The root directory of Grok Build’s on-disk state. Defaults to `~/.grok`, or `$GROK_HOME` when set.
 _Avoid_: server, cloud, remote data root
 
+**Claude home**:
+The root directory of Claude Code’s on-disk state. Defaults to `~/.claude`, or `$CLAUDE_CONFIG_DIR` / `$CLAUDE_HOME` when set.
+_Avoid_: Claude.ai web history, Anthropic cloud
+
 **Data root**:
-The configured on-disk root from which sessions are discovered for a given Agent. For Grok Build this is Grok home. Future agents will each have their own default root and override.
+The configured on-disk root for the selected Agent (Grok home or Claude home).
 
 **Project**:
-A working-directory group under a Data root that owns zero or more Sessions. For Grok Build this is an encoded cwd folder under `sessions/`. Displayed by path/name in the Projects column.
+A working-directory group under a Data root that owns zero or more Sessions (Grok: encoded cwd under `sessions/`; Claude: folder under `projects/`).
 _Avoid_: repository (unless referring to git metadata on a session), workspace (ambiguous with editor workspaces)
 
 **Session**:

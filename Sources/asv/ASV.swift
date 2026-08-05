@@ -8,8 +8,8 @@ struct ASV: ParsableCommand {
         commandName: "asv",
         abstract: "Agent Session Viewer — list and export local coding-agent sessions (read-only).",
         discussion: """
-        Browse Grok Build sessions on disk and export portable JSON bundles.
-        Does not modify anything under the data root.
+        Browse coding-agent sessions on disk (Grok Build, Claude Code) and export
+        portable JSON bundles. Does not modify anything under the data root.
 
         COMMANDS
           list                  Overview of projects and session counts (default)
@@ -19,24 +19,22 @@ struct ASV: ParsableCommand {
           export <id>|--all     Write full-trace JSON file(s) into a directory
 
         GLOBAL OPTIONS (most commands)
-          --home <path>         Data root (default: $GROK_HOME or ~/.grok)
+          --agent <name>        grok-build (default) | claude-code
+          --home <path>         Agent data root override
+                                (Grok: $GROK_HOME|~/.grok; Claude: $CLAUDE_CONFIG_DIR|~/.claude)
           --json                Machine-readable JSON on stdout (list/projects/sessions/show)
           -h, --help            Show help for asv or a subcommand
           --version             Print version
 
         USAGE EXAMPLES
-          asv
           asv list
+          asv list --agent claude-code
           asv list --home ~/.grok --json
-          asv projects
-          asv projects --json
+          asv projects --agent claude-code
           asv sessions
-          asv sessions '%2FUsers%2Fyou%2Fmy-project'
           asv show 019f623a-a8d1-7591-beff-c41fc716b171
-          asv show 019f623a-a8d1-7591-beff-c41fc716b171 --json
-          asv export 019f623a-a8d1-7591-beff-c41fc716b171 --out ./out
-          asv export --all --out ./out
-          asv export --all --home /path/to/grok-home --out ./out
+          asv show <claude-session-id> --agent claude-code
+          asv export --all --agent claude-code --out ./out
 
         GETTING HELP FOR ONE COMMAND
           asv list --help
@@ -62,11 +60,31 @@ struct HomeOptions: ParsableArguments {
     @Option(
         name: .long,
         help: ArgumentHelp(
-            "Data root directory.",
-            discussion: "Defaults to $GROK_HOME when set, otherwise ~/.grok."
+            "Agent to browse.",
+            discussion: "grok-build (default) or claude-code."
+        )
+    )
+    var agent: String = AgentKind.grokBuild.rawValue
+
+    @Option(
+        name: .long,
+        help: ArgumentHelp(
+            "Data root directory override.",
+            discussion: "Grok: $GROK_HOME or ~/.grok. Claude: $CLAUDE_CONFIG_DIR / $CLAUDE_HOME or ~/.claude."
         )
     )
     var home: String?
+
+    func resolvedAgent() throws -> AgentKind {
+        guard let kind = AgentKind(rawValue: agent) else {
+            throw ValidationError("Unknown agent '\(agent)'. Use: grok-build, claude-code")
+        }
+        return kind
+    }
+
+    func makeStore() throws -> any AgentSessionStore {
+        AgentStoreFactory.make(agent: try resolvedAgent(), homeOverride: home)
+    }
 }
 
 // MARK: - list
@@ -99,13 +117,14 @@ struct ListCommand: ParsableCommand {
     var json = false
 
     func run() throws {
-        let catalog = GrokCatalog(homeOverride: homeOptions.home)
-        let projects = try catalog.listProjects()
+        let store = try homeOptions.makeStore()
+        let projects = try store.listProjects()
         let totalSessions = projects.reduce(0) { $0 + $1.sessionCount }
 
         if json {
             try printJSON([
-                "data_root": catalog.dataRoot.path,
+                "agent": store.agent.rawValue,
+                "data_root": store.dataRoot.path,
                 "project_count": projects.count,
                 "session_count": totalSessions,
                 "projects": projects.map { projectJSON($0) },
@@ -113,7 +132,8 @@ struct ListCommand: ParsableCommand {
             return
         }
 
-        print("Data root: \(catalog.dataRoot.path)")
+        print("Agent:     \(store.agent.displayName) (\(store.agent.rawValue))")
+        print("Data root: \(store.dataRoot.path)")
         print("Projects: \(projects.count)  Sessions: \(totalSessions)")
         print("")
         for p in projects {
@@ -153,15 +173,16 @@ struct ProjectsCommand: ParsableCommand {
     var json = false
 
     func run() throws {
-        let catalog = GrokCatalog(homeOverride: homeOptions.home)
-        let projects = try catalog.listProjects()
+        let store = try homeOptions.makeStore()
+        let projects = try store.listProjects()
 
         if json {
             try printJSON(projects.map { projectJSON($0) })
             return
         }
 
-        print("Data root: \(catalog.dataRoot.path)")
+        print("Agent:     \(store.agent.rawValue)")
+        print("Data root: \(store.dataRoot.path)")
         for p in projects {
             print("\(p.id)\t\(p.sessionCount)\t\(p.path)")
         }
@@ -206,15 +227,16 @@ struct SessionsCommand: ParsableCommand {
     var json = false
 
     func run() throws {
-        let catalog = GrokCatalog(homeOverride: homeOptions.home)
-        let sessions = try catalog.listSessions(projectId: project)
+        let store = try homeOptions.makeStore()
+        let sessions = try store.listSessions(projectId: project)
 
         if json {
             try printJSON(sessions.map { sessionJSON($0) })
             return
         }
 
-        print("Data root: \(catalog.dataRoot.path)")
+        print("Agent:     \(store.agent.rawValue)")
+        print("Data root: \(store.dataRoot.path)")
         for s in sessions {
             let updated = s.updatedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "-"
             print("\(s.id)\t\(s.messageCount)\t\(updated)\t\(s.title)")
@@ -262,10 +284,11 @@ struct ShowCommand: ParsableCommand {
     var full = false
 
     func run() throws {
-        let catalog = GrokCatalog(homeOverride: homeOptions.home)
-        let session = try catalog.session(id: sessionId)
+        let store = try homeOptions.makeStore()
+        let session = try store.session(id: sessionId)
         let mode: DetailViewMode = full ? .fullTrace : .readable
-        let events = try SessionTranscript.events(for: session, mode: mode)
+        let raw = try store.loadEvents(session: session)
+        let events = mode == .fullTrace ? raw : SessionTranscript.coalesceForReadable(raw)
 
         if json {
             var payload = sessionJSON(session)
@@ -358,14 +381,14 @@ struct ExportCommand: ParsableCommand {
     var out: String = "./asv-export"
 
     func run() throws {
-        let catalog = GrokCatalog(homeOverride: homeOptions.home)
+        let store = try homeOptions.makeStore()
         let outURL = URL(fileURLWithPath: (out as NSString).expandingTildeInPath, isDirectory: true)
 
         let sessions: [SessionInfo]
         if all {
-            sessions = try catalog.listSessions()
+            sessions = try store.listSessions(projectId: nil)
         } else if let sessionId {
-            sessions = [try catalog.session(id: sessionId)]
+            sessions = [try store.session(id: sessionId)]
         } else {
             throw ValidationError("Provide a session id or --all. See: asv export --help")
         }

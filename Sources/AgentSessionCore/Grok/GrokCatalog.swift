@@ -18,7 +18,8 @@ public enum GrokCatalogError: Error, LocalizedError, Equatable {
 }
 
 /// Read-only catalog of Grok Build projects and sessions under a Data root.
-public struct GrokCatalog {
+public struct GrokCatalog: AgentSessionStore {
+    public var agent: AgentKind { .grokBuild }
     public let dataRoot: URL
     private let fileManager: FileManager
 
@@ -28,8 +29,13 @@ public struct GrokCatalog {
     }
 
     public init(homeOverride: String? = nil, fileManager: FileManager = .default) {
-        self.dataRoot = DataRoot.resolve(override: homeOverride, fileManager: fileManager)
+        self.dataRoot = DataRoot.resolve(agent: .grokBuild, override: homeOverride, fileManager: fileManager)
         self.fileManager = fileManager
+    }
+
+    public func loadEvents(session: SessionInfo) throws -> [SessionEvent] {
+        let dir = URL(fileURLWithPath: session.directoryPath, isDirectory: true)
+        return try GrokUpdates.loadEvents(sessionDirectory: dir)
     }
 
     public var sessionsURL: URL {
@@ -139,7 +145,7 @@ public struct GrokCatalog {
                 return try loadSessionInfo(sessionDir: candidate, projectId: encoded, projectPath: projectPath)
             }
         }
-        throw GrokCatalogError.sessionNotFound(sessionId)
+        throw AgentCatalogError.sessionNotFound(sessionId)
     }
 
     // MARK: - Internals
@@ -147,11 +153,11 @@ public struct GrokCatalog {
     private func ensureSessionsDir() throws {
         var isDir: ObjCBool = false
         if !fileManager.fileExists(atPath: dataRoot.path, isDirectory: &isDir) || !isDir.boolValue {
-            throw GrokCatalogError.dataRootMissing(dataRoot.path)
+            throw AgentCatalogError.dataRootMissing(dataRoot.path)
         }
         let sessions = sessionsURL
         if !fileManager.fileExists(atPath: sessions.path, isDirectory: &isDir) || !isDir.boolValue {
-            throw GrokCatalogError.sessionsDirMissing(sessions.path)
+            throw AgentCatalogError.sessionsDirMissing(sessions.path)
         }
     }
 

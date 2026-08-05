@@ -10,14 +10,21 @@ public enum DetailViewMode: String, Sendable, Codable, CaseIterable {
 
 /// Load and shape a Session’s Detail stream for UI and CLI.
 public enum SessionTranscript {
-    /// Load raw normalized events from the session directory (`updates.jsonl` for Grok).
+    /// Load raw normalized events for Grok session directories (`updates.jsonl`).
     public static func loadEvents(sessionDirectory: URL) throws -> [SessionEvent] {
         try GrokUpdates.loadEvents(sessionDirectory: sessionDirectory)
     }
 
+    /// Load events using the session’s agent kind (Grok directory vs Claude JSONL file).
     public static func loadEvents(session: SessionInfo) throws -> [SessionEvent] {
-        let dir = URL(fileURLWithPath: session.directoryPath, isDirectory: true)
-        return try loadEvents(sessionDirectory: dir)
+        switch session.agent {
+        case .grokBuild:
+            let dir = URL(fileURLWithPath: session.directoryPath, isDirectory: true)
+            return try GrokUpdates.loadEvents(sessionDirectory: dir)
+        case .claudeCode:
+            let file = URL(fileURLWithPath: session.directoryPath)
+            return try ClaudeTranscript.loadEventsExpanded(from: file)
+        }
     }
 
     /// Events shaped for a given view mode.

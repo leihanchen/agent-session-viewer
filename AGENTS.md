@@ -15,8 +15,8 @@ Instructions for AI coding agents working in **this repository**. Keep changes a
 | Shared library | `AgentSessionCore` |
 
 - **English UI only**
-- **v1 agent store:** Grok Build only (`~/.grok` / `$GROK_HOME` / `--home`)
-- **Future:** more agents behind the same models; do **not** bake “Grok” into product/CLI names
+- **Agent stores:** Grok Build (`~/.grok`) and Claude Code (`~/.claude`); toolbar picker + CLI `--agent`
+- **Future agents:** add `AgentSessionStore` under `Sources/AgentSessionCore/<Agent>/`
 - **Not:** a website, WebView app, cloud service, or session editor
 
 ---
@@ -27,7 +27,7 @@ Instructions for AI coding agents working in **this repository**. Keep changes a
 2. **No network required** for browse/export.
 3. **SwiftUI + Swift** for app and CLI — not Tauri, Electron, or a web UI stack (ADR 0001).
 4. **Non-sandboxed** local app for v1 (must read outside the app container).
-5. Prefer **agent-agnostic** types in Core (`Project`, `Session`, `Event`, `ExportBundle`); put Grok layout parsing under `Sources/AgentSessionCore/Grok/`.
+5. Prefer **agent-agnostic** types in Core (`Project`, `Session`, `Event`, `ExportBundle`); put layout parsing under `Sources/AgentSessionCore/Grok/` or `Claude/` via `AgentSessionStore`.
 6. Use glossary terms from `CONTEXT.md` in code comments, UI strings, and docs (e.g. **Project**, **Session**, **Detail stream**, not “workspace/chat/thread” for those concepts).
 
 ---
@@ -102,9 +102,9 @@ Commands must remain discoverable via `asv --help` (overview + examples) and `as
 | `show <session-id>` | Metadata **+ full conversation** (Readable by default; `--full` for full trace) |
 | `export <id>\|--all` | Full-trace JSON into a directory |
 
-Common flags: `--home <path>`, `--json` (list/projects/sessions/show), `--full` (`show`), `--out <dir>` (export).
+Common flags: `--agent grok-build|claude-code` (default `grok-build`), `--home <path>`, `--json` (list/projects/sessions/show), `--full` (`show`), `--out <dir>` (export).
 
-Export = **one JSON file per session**, full event trace, fields at least: `schema_version`, `agent` (e.g. `"grok-build"`), session info, `events[]`. Bulk export = directory of files (not zip in v1).
+Export = **one JSON file per session**, full event trace, fields at least: `schema_version`, `agent` (`grok-build` or `claude-code`), session info, `events[]`. Bulk export = directory of files (not zip in v1). One agent per command (no cross-agent list).
 
 ---
 
@@ -119,24 +119,38 @@ Three columns (CC LOG–style, English):
 - **Session title:** summary → first user message → short id  
 - **Readable mode** (default): coalesced turns; **Full trace** toolbar toggle: every event  
 - Load via `SessionTranscript.events(for:mode:)` from `updates.jsonl`  
-- **One search field only:** “Search all conversations…” — full-text across every session (debounced); not project metadata. Results sorted by match count then `updatedAt`; highlight in snippets + detail (`ConversationSearch` + `HighlightedText`). Empty query lists all sessions. 
+- **Agent picker** (toolbar): Grok Build | Claude Code — reloads that agent’s data root only  
+- **One search field only:** “Search all conversations…” — full-text across every session **of the selected agent** (debounced). Results sorted by match count then `updatedAt`; highlight in snippets + detail. Empty query lists all sessions for that agent.
 - Subagent sessions: **flat peers** (no nesting in v1)  
 - Snapshot load / Refresh only — no live file watching in v1  
 
 ---
 
-## Grok on-disk layout (v1 adapter)
+## On-disk layouts
+
+### Grok Build
 
 ```
 <data-root>/sessions/<percent-encoded-cwd>/<session-id>/
   summary.json      # metadata / title
   updates.jsonl     # authoritative conversation + tool stream
-  ...
 ```
 
-- Default data root: `$GROK_HOME` or `~/.grok`  
-- Skip non-directory entries under `sessions/` (e.g. sqlite indexes)  
-- Parse via `GrokCatalog` / `GrokUpdates`; keep export normalized, not a raw dir copy  
+- Default: `$GROK_HOME` or `~/.grok`
+- Adapter: `GrokCatalog` / `GrokUpdates`
+
+### Claude Code
+
+```
+<data-root>/projects/<encoded-cwd>/<session-uuid>.jsonl
+```
+
+- Default: `$CLAUDE_CONFIG_DIR` / `$CLAUDE_HOME` or `~/.claude`
+- Prefer JSONL `cwd` over reverse-encoding the folder name
+- Adapter: `ClaudeCatalog` / `ClaudeTranscript`
+- Do not depend on third-party indexes (e.g. `cc-log.sqlite`)
+
+Both implement `AgentSessionStore` via `AgentStoreFactory`. 
 
 ---
 
@@ -171,7 +185,7 @@ Install product rules (ADR 0006):
 
 ## Out of scope (v1)
 
-Writing/deleting agent session files · live tail · full-text body search · zip bulk export · App Sandbox / Mac App Store · nested subagent UI · second agent adapter (design only) · web frontend
+Writing/deleting agent session files · live tail · zip bulk export · App Sandbox / Mac App Store · nested subagent UI · Cursor/Codex adapters · cross-agent search · web frontend
 
 ---
 
