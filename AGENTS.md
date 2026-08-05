@@ -73,16 +73,16 @@ Release CLI / installer:
 ./scripts/embed-version.sh
 swift build -c release --product asv
 ./.build/release/asv --version            # must match VERSION / tag
-ASV_VERSION=0.1.0 ./scripts/package-dmg.sh   # PKG only; Info.plist matches asv --version
+ASV_VERSION=0.2.0 ./scripts/package-dmg.sh   # PKG only; Info.plist matches asv --version
 ```
 
-**Version source of truth:** `scripts/embed-version.sh` → `VERSION` + `Sources/AgentSessionCore/Version.swift` (`ASVVersion.current`). Used by CLI and CFBundleShortVersionString.
+**Version source of truth:** `scripts/embed-version.sh` → `VERSION` + `Sources/AgentSessionCore/Version.swift` (`ASVVersion.current`). Used by CLI and CFBundleShortVersionString. See `CHANGELOG.md` for release history.
 
 ### CI (GitHub Actions)
 
 - Workflow: `.github/workflows/build-installer.yml` on **macos-14**
 - Rebuilds installer remotely via:
-  - `workflow_dispatch` (`gh workflow run build-installer.yml -f version=0.1.0`)
+  - `workflow_dispatch` (`gh workflow run build-installer.yml -f version=0.2.0`)
   - `repository_dispatch` event type `build-installer`
   - tag `v*`
   - push to `main` when packaging/source paths change

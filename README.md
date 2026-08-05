@@ -139,7 +139,7 @@ AGENTS.md
 
 ```bash
 ./scripts/package-dmg.sh
-# optional: ASV_VERSION=0.1.0 ./scripts/package-dmg.sh
+# optional: ASV_VERSION=0.2.0 ./scripts/package-dmg.sh
 ```
 
 Outputs:
@@ -150,7 +150,9 @@ Outputs:
 | Stable pkg name | `dist/AgentSessionViewer.pkg` |
 | Staged app | `dist/stage-build/Agent Session Viewer.app` |
 
-**User flow:** download **AgentSessionViewer-x.y.z.pkg** from Releases → double-click → authenticate → open the app from Applications and run `asv --help` in Terminal.
+**User flow:** download **AgentSessionViewer-0.2.0.pkg** (or latest) from [Releases](https://github.com/leihanchen/agent-session-viewer/releases) → double-click → authenticate → open the app from Applications and run `asv --help` in Terminal.
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 If the CLI installs but the app does not appear under `/Applications`, you may have an older relocatable package that updated a build copy instead. Clean and reinstall:
 
@@ -167,20 +169,20 @@ Workflow: [`.github/workflows/build-installer.yml`](.github/workflows/build-inst
 
 | Trigger | How |
 |---------|-----|
-| **Manual / remote CLI** | `gh workflow run build-installer.yml -f version=0.1.0` |
+| **Manual / remote CLI** | `gh workflow run build-installer.yml -f version=0.2.0` |
 | **Actions UI** | Actions → **Build installer** → Run workflow |
 | **API (`repository_dispatch`)** | See below |
-| **Tag** | `git tag v0.1.0 && git push origin v0.1.0` (uploads release assets) |
+| **Tag** | `git tag v0.2.0 && git push origin v0.2.0` (uploads release assets) |
 | **Push to `main`** | When `Sources/`, `scripts/`, or packaging paths change |
 
 Artifacts (`.pkg` only) appear under the workflow run → **Artifacts**, and on tag Releases.
 
 ```bash
 # Trigger from anywhere with gh authenticated
-gh workflow run build-installer.yml --repo leihanchen/agent-session-viewer -f version=0.1.0
+gh workflow run build-installer.yml --repo leihanchen/agent-session-viewer -f version=0.2.0
 
 # Or via repository_dispatch
 gh api repos/leihanchen/agent-session-viewer/dispatches \
   -f event_type=build-installer \
-  -f 'client_payload[version]=0.1.0'
+  -f 'client_payload[version]=0.2.0'
 ```

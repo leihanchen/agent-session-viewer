@@ -1,9 +1,9 @@
-# Agent Session Viewer — Product Spec (v1)
+# Agent Session Viewer — Product Spec
 
-**Status:** P0 + P1 complete — Core, `asv` (including conversation `show`), SwiftUI Detail stream (Readable / Full trace), export, DMG packaging.  
+**Status:** Released **v0.2.0** — multi-agent (Grok Build, Claude Code, Codex), conversation search, PKG installer, full Detail stream.  
 **Repo:** `/Users/mac/Documents/github_repo/agent-session-viewer`  
 **UI language:** English only  
-**Related:** `CONTEXT.md`, `docs/adr/0001`–`0006`
+**Related:** `CONTEXT.md`, `docs/adr/0001`–`0007`, `CHANGELOG.md`
 
 ---
 
