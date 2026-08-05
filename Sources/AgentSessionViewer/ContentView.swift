@@ -1,7 +1,8 @@
 import SwiftUI
 import AgentSessionCore
 
-/// Three-column browser: Projects → Sessions → Session info + Conversation stream.
+/// Three-column browser: Projects → Sessions → Conversation.
+/// Single toolbar search: full-text across **all** sessions / conversations.
 struct ContentView: View {
     @StateObject private var model = AppModel()
 
@@ -43,10 +44,21 @@ struct ContentView: View {
                 .help("Reload projects and sessions from disk")
             }
         }
-        .searchable(text: $model.projectFilter, prompt: "Filter projects")
+        // One search field only — conversation full-text over every session.
+        .searchable(text: $model.conversationQuery, prompt: "Search all conversations…")
+        .onChange(of: model.conversationQuery) { _, _ in
+            model.scheduleConversationSearch()
+        }
         .onAppear { model.refresh() }
         .onChange(of: model.selectedSessionId) { _, _ in
             model.reloadEvents()
+        }
+        .onChange(of: model.selectedProjectId) { _, projectId in
+            // Browse only: jump to that project's sessions (search is always global).
+            guard !model.isSearchActive, let projectId else { return }
+            if let first = model.sessions.first(where: { $0.projectId == projectId }) {
+                model.selectedSessionId = first.id
+            }
         }
         .alert("Error", isPresented: Binding(
             get: { model.errorMessage != nil },
@@ -58,8 +70,10 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Projects
+
     private var projectsColumn: some View {
-        List(model.filteredProjects, selection: $model.selectedProjectId) { project in
+        List(model.projects, selection: $model.selectedProjectId) { project in
             VStack(alignment: .leading, spacing: 4) {
                 Text(project.displayName)
                     .font(.headline)
@@ -85,55 +99,175 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Sessions
+
     private var sessionsColumn: some View {
-        List(model.sessionsForSelection, selection: $model.selectedSessionId) { session in
-            VStack(alignment: .leading, spacing: 4) {
-                Text(session.title)
-                    .font(.body.weight(.medium))
-                    .lineLimit(2)
-                HStack {
-                    Text(session.id)
-                        .font(.caption2.monospaced())
-                    Spacer()
-                    if let updated = session.updatedAt {
-                        Text(updated, style: .date)
-                            .font(.caption2)
-                    }
-                }
-                .foregroundStyle(.secondary)
-                Text("\(session.messageCount) messages · \(session.model ?? "—")")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+        Group {
+            if model.isSearchActive {
+                searchResultsList
+            } else {
+                browseSessionsList
             }
-            .tag(session.id)
-            .padding(.vertical, 2)
         }
-        .navigationTitle("Sessions")
+        .navigationTitle(model.isSearchActive ? "Search results" : "All sessions")
+        .safeAreaInset(edge: .bottom) {
+            sessionsFooter
+        }
+    }
+
+    private var browseSessionsList: some View {
+        // Always list every session (not gated on project selection).
+        List(model.allSessionsSorted, selection: $model.selectedSessionId) { session in
+            sessionRow(session)
+                .tag(session.id)
+        }
         .overlay {
-            if model.selectedProjectId == nil {
-                ContentUnavailableView("Select a project", systemImage: "folder")
-            } else if model.sessionsForSelection.isEmpty {
+            if model.allSessionsSorted.isEmpty {
                 ContentUnavailableView("No sessions", systemImage: "bubble.left.and.bubble.right")
             }
         }
     }
 
+    private var searchResultsList: some View {
+        List(selection: $model.selectedSessionId) {
+            if model.isSearching {
+                HStack {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Searching conversations…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .listRowSeparator(.hidden)
+            }
+            ForEach(model.searchResults) { hit in
+                searchHitRow(hit)
+                    .tag(hit.session.id)
+            }
+        }
+        .overlay {
+            if !model.isSearching && model.searchResults.isEmpty {
+                ContentUnavailableView(
+                    "No matching sessions",
+                    systemImage: "magnifyingglass",
+                    description: Text("No conversation contains “\(model.trimmedQuery)”.")
+                )
+            }
+        }
+    }
+
+    private var sessionsFooter: some View {
+        Group {
+            if model.isSearchActive {
+                if model.isSearching {
+                    Text("Searching all conversations…")
+                } else {
+                    Text("\(model.searchResults.count) of \(model.sessions.count) sessions matched")
+                }
+            } else {
+                Text("\(model.sessions.count) sessions (all projects)")
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity)
+        .padding(8)
+    }
+
+    private func sessionRow(_ session: SessionInfo) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(session.title)
+                .font(.body.weight(.medium))
+                .lineLimit(2)
+            Text(session.projectPath)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            HStack {
+                Text(session.id)
+                    .font(.caption2.monospaced())
+                Spacer()
+                if let updated = session.updatedAt {
+                    Text(updated, style: .date)
+                        .font(.caption2)
+                }
+            }
+            .foregroundStyle(.secondary)
+            Text("\(session.messageCount) messages · \(session.model ?? "—")")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func searchHitRow(_ hit: ConversationSearchHit) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(hit.session.title)
+                .font(.body.weight(.medium))
+                .lineLimit(2)
+            Text(hit.session.projectPath)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            HStack {
+                Text("\(hit.matchCount) match\(hit.matchCount == 1 ? "" : "es")")
+                    .font(.caption2.weight(.semibold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.accentColor.opacity(0.15), in: Capsule())
+                Spacer()
+                if let updated = hit.session.updatedAt {
+                    Text(updated, style: .date)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            HighlightedText(text: hit.firstSnippet, query: model.trimmedQuery, font: .caption)
+                .lineLimit(3)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Details
+
     private var detailColumn: some View {
         Group {
             if let session = model.selectedSession {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        sessionInfoCard(session)
-                        conversationSection
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            sessionInfoCard(session)
+                            conversationSection
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .onChange(of: model.events) { _, _ in
+                        scrollToFirstMatch(proxy: proxy)
+                    }
+                    .onChange(of: model.conversationQuery) { _, _ in
+                        scrollToFirstMatch(proxy: proxy)
+                    }
                 }
             } else {
                 ContentUnavailableView("Select a session", systemImage: "doc.text")
             }
         }
         .navigationTitle("Details")
+    }
+
+    private func scrollToFirstMatch(proxy: ScrollViewProxy) {
+        guard model.isSearchActive,
+              let id = model.firstMatchingEventId
+        else { return }
+        DispatchQueue.main.async {
+            withAnimation {
+                proxy.scrollTo(id, anchor: .center)
+            }
+        }
     }
 
     private var conversationSection: some View {
@@ -163,7 +297,12 @@ struct ContentView: View {
             } else {
                 LazyVStack(alignment: .leading, spacing: 10) {
                     ForEach(model.events) { event in
-                        EventRowView(event: event, mode: model.detailMode)
+                        EventRowView(
+                            event: event,
+                            mode: model.detailMode,
+                            highlightQuery: model.isSearchActive ? model.trimmedQuery : nil
+                        )
+                        .id(event.id)
                     }
                 }
             }
@@ -204,6 +343,7 @@ struct ContentView: View {
 private struct EventRowView: View {
     let event: SessionEvent
     let mode: DetailViewMode
+    var highlightQuery: String?
 
     @State private var expanded = false
 
@@ -235,14 +375,27 @@ private struct EventRowView: View {
 
             let body = event.content?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if !body.isEmpty {
-                let collapsed = mode == .readable && shouldCollapse(body)
-                Text(collapsed && !expanded ? String(body.prefix(500)) + (body.count > 500 ? "…" : "") : body)
-                    .font(.system(.callout, design: .default))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                let hasQuery = bodyMatchesQuery(body)
+                let collapsed = mode == .readable && shouldCollapse(body) && !hasQuery
+                let shown = collapsed && !expanded
+                    ? String(body.prefix(500)) + (body.count > 500 ? "…" : "")
+                    : body
 
-                if collapsed {
-                    Button(expanded ? "Show less" : "Show more") {
+                if let q = highlightQuery, !q.isEmpty {
+                    HighlightedText(text: shown, query: q, font: .system(.callout, design: .default))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text(shown)
+                        .font(.system(.callout, design: .default))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if collapsed || (hasQuery && shouldCollapse(body) && !expanded) {
+                    // If we forced expand due to match, still allow collapse only when no query match
+                }
+                if mode == .readable && shouldCollapse(body) {
+                    Button(expanded || hasQuery ? (expanded ? "Show less" : "Show full") : "Show more") {
                         expanded.toggle()
                     }
                     .font(.caption)
@@ -262,6 +415,13 @@ private struct EventRowView: View {
             RoundedRectangle(cornerRadius: 10)
                 .strokeBorder(badgeColor.opacity(0.25), lineWidth: 1)
         )
+    }
+
+    private func bodyMatchesQuery(_ body: String) -> Bool {
+        guard let q = highlightQuery?.trimmingCharacters(in: .whitespacesAndNewlines), !q.isEmpty else {
+            return false
+        }
+        return body.range(of: q, options: [.caseInsensitive]) != nil
     }
 
     private func shouldCollapse(_ body: String) -> Bool {
@@ -292,7 +452,6 @@ final class AppModel: ObservableObject {
     @Published var sessions: [SessionInfo] = []
     @Published var selectedProjectId: Project.ID?
     @Published var selectedSessionId: SessionInfo.ID?
-    @Published var projectFilter: String = ""
     @Published var dataRootPath: String = ""
     @Published var errorMessage: String?
 
@@ -301,24 +460,54 @@ final class AppModel: ObservableObject {
     @Published var isLoadingEvents = false
     @Published var eventsError: String?
 
-    var filteredProjects: [Project] {
-        let q = projectFilter.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return projects }
-        return projects.filter {
-            $0.path.localizedCaseInsensitiveContains(q)
-                || $0.displayName.localizedCaseInsensitiveContains(q)
-                || $0.id.localizedCaseInsensitiveContains(q)
-        }
+    /// Single toolbar search: full-text over every session conversation.
+    @Published var conversationQuery: String = ""
+    @Published var searchResults: [ConversationSearchHit] = []
+    @Published var isSearching = false
+
+    private var searchTask: Task<Void, Never>?
+
+    var trimmedQuery: String {
+        conversationQuery.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    var sessionsForSelection: [SessionInfo] {
-        guard let selectedProjectId else { return [] }
-        return sessions.filter { $0.projectId == selectedProjectId }
+    var isSearchActive: Bool {
+        !trimmedQuery.isEmpty
+    }
+
+    /// Browse list: every session under the data root, newest first.
+    var allSessionsSorted: [SessionInfo] {
+        sessions.sorted { a, b in
+            switch (a.updatedAt, b.updatedAt) {
+            case let (l?, r?):
+                if l != r { return l > r }
+            case (_?, nil):
+                return true
+            case (nil, _?):
+                return false
+            case (nil, nil):
+                break
+            }
+            return a.id < b.id
+        }
     }
 
     var selectedSession: SessionInfo? {
         guard let selectedSessionId else { return nil }
+        if isSearchActive {
+            return searchResults.first(where: { $0.session.id == selectedSessionId })?.session
+                ?? sessions.first { $0.id == selectedSessionId }
+        }
         return sessions.first { $0.id == selectedSessionId }
+    }
+
+    var firstMatchingEventId: String? {
+        guard isSearchActive else { return nil }
+        let q = trimmedQuery
+        guard !q.isEmpty else { return nil }
+        return events.first { event in
+            (event.content ?? "").range(of: q, options: [.caseInsensitive]) != nil
+        }?.id
     }
 
     func refresh() {
@@ -336,10 +525,14 @@ final class AppModel: ObservableObject {
                 self.selectedSessionId = nil
             }
             reloadEvents()
+            if isSearchActive {
+                scheduleConversationSearch(immediate: true)
+            }
         } catch {
             projects = []
             sessions = []
             events = []
+            searchResults = []
             errorMessage = error.localizedDescription
         }
     }
@@ -360,5 +553,51 @@ final class AppModel: ObservableObject {
             eventsError = error.localizedDescription
         }
         isLoadingEvents = false
+    }
+
+    func scheduleConversationSearch(immediate: Bool = false) {
+        searchTask?.cancel()
+        let q = trimmedQuery
+        if q.isEmpty {
+            isSearching = false
+            searchResults = []
+            return
+        }
+
+        isSearching = true
+        let snapshot = sessions
+        let delayNs: UInt64 = immediate ? 0 : 300_000_000
+
+        searchTask = Task { [weak self] in
+            if delayNs > 0 {
+                try? await Task.sleep(nanoseconds: delayNs)
+            }
+            guard !Task.isCancelled else { return }
+
+            let hits = await Task.detached(priority: .userInitiated) {
+                ConversationSearch.search(sessions: snapshot, query: q) { session in
+                    try SessionTranscript.loadEvents(session: session)
+                }
+            }.value
+
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self else { return }
+                // Drop stale results if the query changed while we scanned.
+                guard self.trimmedQuery == q else { return }
+                self.searchResults = hits
+                self.isSearching = false
+                // Keep selection if still in results; otherwise select first hit.
+                if let sel = self.selectedSessionId, hits.contains(where: { $0.session.id == sel }) {
+                    self.reloadEvents()
+                } else if let first = hits.first {
+                    self.selectedSessionId = first.session.id
+                    self.reloadEvents()
+                } else {
+                    self.selectedSessionId = nil
+                    self.events = []
+                }
+            }
+        }
     }
 }

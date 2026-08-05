@@ -86,6 +86,29 @@ struct ASVCheck {
             expect(!readable.isEmpty, "readable transcript non-empty")
             expect(readable.contains(where: { $0.type == "user" }), "readable has user turn")
             expect(readable.contains(where: { $0.type == "assistant" }), "readable has assistant turn")
+
+            let allSessions = try catalog.listSessions()
+            let loginHits = ConversationSearch.search(sessions: allSessions, query: "Add login")
+            expect(loginHits.count == 1, "search Add login → 1 session (got \(loginHits.count))")
+            expect(
+                loginHits.first?.session.id == "sess-aaa-1111-1111-1111-111111111111",
+                "search hit is sess-aaa"
+            )
+            expect((loginHits.first?.matchCount ?? 0) >= 1, "login matchCount >= 1")
+
+            let flakyHits = ConversationSearch.search(sessions: allSessions, query: "flaky integration")
+            expect(flakyHits.count == 1, "search flaky → 1 session")
+            expect(
+                flakyHits.first?.session.id == "sess-bbb-2222-2222-2222-222222222222",
+                "search hit is sess-bbb"
+            )
+
+            // Rank: invent higher match count session first via multi-hit phrase present once each —
+            // "tool" may appear in tool events; just ensure empty query yields nothing via API contract.
+            let emptyHits = ConversationSearch.search(sessions: allSessions, query: "   ")
+            expect(emptyHits.isEmpty, "blank query → no hits")
+            let miss = ConversationSearch.search(sessions: allSessions, query: "zzznomatch999")
+            expect(miss.isEmpty, "miss query → no hits")
         } catch {
             fputs("FAIL: catalog/export threw \(error)\n", stderr)
             failures += 1

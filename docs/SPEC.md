@@ -97,7 +97,7 @@
 | U6 | **Readable mode (default):** consecutive text chunks coalesced into turns; long bodies collapsible (“Show more”); hook/noise types hidden. |
 | U7 | **Full trace mode:** toolbar toggle shows every normalized Event including thinking and tool args/results. |
 | U8 | Header chrome: product name, Data root path, Refresh control; optional index/session counts. |
-| U9 | Search/filter v1: **metadata only** — Projects by path/name; Sessions by title/id/date. No body full-text. |
+| U9 | **One toolbar search (UI):** searches **all** sessions’ full conversation bodies (case-insensitive). Matching sessions appear in the Sessions column, sorted by match count then recency; snippets and detail stream **highlight** the query. Empty query lists every session (all projects). Not a project-name filter. |
 | U10 | Subagent Sessions listed as **flat peers** under the Project. |
 | U11 | Export actions: export current Session; export all Sessions in current Project or all Projects (bulk → directory). |
 | U12 | English UI strings only. |

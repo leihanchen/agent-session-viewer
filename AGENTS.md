@@ -119,7 +119,7 @@ Three columns (CC LOG–style, English):
 - **Session title:** summary → first user message → short id  
 - **Readable mode** (default): coalesced turns; **Full trace** toolbar toggle: every event  
 - Load via `SessionTranscript.events(for:mode:)` from `updates.jsonl`  
-- Search v1: **metadata only** (path/title/id/date)  
+- **One search field only:** “Search all conversations…” — full-text across every session (debounced); not project metadata. Results sorted by match count then `updatedAt`; highlight in snippets + detail (`ConversationSearch` + `HighlightedText`). Empty query lists all sessions. 
 - Subagent sessions: **flat peers** (no nesting in v1)  
 - Snapshot load / Refresh only — no live file watching in v1  
 

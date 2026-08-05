@@ -44,6 +44,10 @@ The ordered sequence of Events for one Session shown in the Details column (Conv
 **Event**:
 A single item in the Detail stream: user message, assistant message, thinking, tool use, tool result, error, or similar agent-trace record. Normalized across agents at the Export bundle boundary.
 
+**Conversation search**:
+UI search that finds Sessions whose Detail stream text contains a query, ranks them, and highlights matches. Empty query means normal project browse.
+_Avoid_: project-only filter (that is browse metadata filtering, not conversation search)
+
 **Readable mode**:
 Detail stream presentation that coalesces consecutive text chunks into turns and de-emphasizes noise; default for UI and `asv show`.
 _Avoid_: summary-only view (implies messages are omitted)
