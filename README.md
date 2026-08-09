@@ -1,12 +1,12 @@
 # Agent Session Viewer
 
-Local, read-only **macOS** browser for coding-agent sessions, with companion CLI **`asv`**.
+Local **macOS** browser for coding-agent sessions, with companion CLI **`asv`**. Browse and export without changing agent data; **delete** permanently removes one session after confirmation.
 
 | | |
 |--|--|
 | **Agents** | **Grok Build**, **Claude Code**, and **Codex** (toolbar picker / CLI `--agent`) |
 | **UI** | SwiftUI three-column browser (Projects → Sessions → Conversation) |
-| **CLI** | `list` / `projects` / `sessions` / `show` / `export` |
+| **CLI** | `list` / `projects` / `sessions` / `show` / `export` / `delete` |
 
 See [docs/SPEC.md](docs/SPEC.md) (requirements), [AGENTS.md](AGENTS.md) (coding-agent runbook), [CONTEXT.md](CONTEXT.md) (domain glossary), and [docs/adr/](docs/adr/) (decisions).
 
@@ -62,17 +62,20 @@ asv show <session-id>
 asv show <session-id> --full
 asv export <session-id> --out ./out
 asv export --all --out ./out
+asv delete <session-id> --yes
 
 # Claude Code
 asv list --agent claude-code
 asv show <session-id> --agent claude-code
 asv export --all --agent claude-code --out ./out
+asv delete <session-id> --agent claude-code --yes
 
 # Codex
 asv list --agent codex
 asv sessions --agent codex
 asv show <session-id> --agent codex
 asv export --all --agent codex --out ./out
+asv delete <session-id> --agent codex --yes
 
 # Overrides
 asv list --home /path/to/grok-home
@@ -87,6 +90,9 @@ asv show <session-id> --json
 | `--home` | Override data root for that agent |
 | `--json` | Machine-readable output (`list` / `projects` / `sessions` / `show`) |
 | `--full` | Full event trace on `show` (default is readable/coalesced) |
+| `--yes` | Skip interactive confirmation on `delete` (required for non-TTY) |
+
+**Delete:** removes the session’s primary local artifact (Grok: session directory; Claude/Codex: jsonl). Irreversible. Prefer stopping the agent if that session is still active.
 
 Export JSON includes `"agent": "grok-build"`, `"claude-code"`, or `"codex"`.
 

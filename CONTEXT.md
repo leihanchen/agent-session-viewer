@@ -1,6 +1,6 @@
 # Agent Session Viewer
 
-A local, read-only macOS application (with companion CLI) for browsing and exporting coding-agent sessions stored on disk. English UI only. Supports Grok Build and Claude Code via an agent picker.
+A local macOS application (with companion CLI) for browsing, exporting, and optionally deleting coding-agent sessions stored on disk. English UI only. Supports Grok Build, Claude Code, and Codex via an agent picker. Browse/export are non-mutating; delete permanently removes one selected session after confirmation.
 
 ## Language
 
@@ -9,8 +9,12 @@ The product: a native macOS application that visualizes coding-agent sessions an
 _Avoid_: Agent Session View, Grok Session Viewer (as product name), Grok Log, CC LOG, web viewer, online viewer
 
 **asv**:
-The companion command-line binary for listing and exporting sessions without opening the GUI. Installable on its own or bundled with the app distribution.
+The companion command-line binary for listing, exporting, and deleting sessions without opening the GUI. Installable on its own or bundled with the app distribution.
 _Avoid_: gsv
+
+**Session delete**:
+Permanently remove one Session’s primary on-disk artifact (Grok directory; Claude/Codex jsonl) from the local Agent data root after UI confirmation or `asv delete --yes` / interactive confirm. Irreversible; not bulk delete.
+_Avoid_: soft delete, trash, wipe project
 
 **Agent**:
 A coding-agent product whose on-disk sessions Agent Session Viewer can read. Supported: Grok Build, Claude Code, Codex. Domain model stays agent-agnostic where practical.

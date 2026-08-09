@@ -110,6 +110,16 @@ public struct ClaudeCatalog: AgentSessionStore {
         return try ClaudeTranscript.loadEventsExpanded(from: url)
     }
 
+    public func deleteSession(id sessionId: String) throws -> SessionDeleteResult {
+        let session = try session(id: sessionId)
+        return try SessionDeleter.delete(
+            session: session,
+            dataRoot: dataRoot,
+            pathKind: .file,
+            fileManager: fileManager
+        )
+    }
+
     // MARK: - Internals
 
     private func ensureProjectsDir() throws {

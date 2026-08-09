@@ -38,6 +38,16 @@ public struct GrokCatalog: AgentSessionStore {
         return try GrokUpdates.loadEvents(sessionDirectory: dir)
     }
 
+    public func deleteSession(id sessionId: String) throws -> SessionDeleteResult {
+        let session = try session(id: sessionId)
+        return try SessionDeleter.delete(
+            session: session,
+            dataRoot: dataRoot,
+            pathKind: .directory,
+            fileManager: fileManager
+        )
+    }
+
     public var sessionsURL: URL {
         DataRoot.sessionsDirectory(dataRoot: dataRoot)
     }

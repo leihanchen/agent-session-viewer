@@ -2,6 +2,18 @@
 
 All notable changes to **Agent Session Viewer** are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **Session delete** in the viewer (toolbar trash + confirmation) and CLI (`asv delete <session-id> [--yes]`)
+- Shared Core `deleteSession` for Grok (session directory), Claude Code, and Codex (jsonl / rollout file)
+- Path safety: refuse deletes outside the agent data root (ADR 0008)
+
+### Changed
+
+- Data-root policy: still non-mutating by default; confirmed single-session delete is the only exception (supersedes absolute read-only in ADR 0002)
+
 ## [0.2.0] — 2026-08-05
 
 ### Highlights

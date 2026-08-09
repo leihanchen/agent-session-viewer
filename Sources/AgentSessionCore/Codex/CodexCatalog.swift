@@ -98,6 +98,16 @@ public struct CodexCatalog: AgentSessionStore {
         return try CodexTranscript.loadEvents(from: url)
     }
 
+    public func deleteSession(id sessionId: String) throws -> SessionDeleteResult {
+        let session = try session(id: sessionId)
+        return try SessionDeleter.delete(
+            session: session,
+            dataRoot: dataRoot,
+            pathKind: .file,
+            fileManager: fileManager
+        )
+    }
+
     // MARK: - Internals
 
     private func ensureSessionsDir() throws {

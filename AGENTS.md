@@ -6,7 +6,7 @@ Instructions for AI coding agents working in **this repository**. Keep changes a
 
 ## What this project is
 
-**Agent Session Viewer** — local, **read-only** macOS app + companion CLI **`asv`** for browsing and exporting coding-agent sessions on disk.
+**Agent Session Viewer** — local macOS app + companion CLI **`asv`** for browsing, exporting, and (when confirmed) deleting coding-agent sessions on disk.
 
 | Surface | Name |
 |---------|------|
@@ -23,7 +23,7 @@ Instructions for AI coding agents working in **this repository**. Keep changes a
 
 ## Hard rules (do not violate)
 
-1. **Read-only toward agent data roots** — never delete, rename, rewrite, or “fix” files under `~/.grok` (or any Data root). Export only **writes** under a user-chosen output path.
+1. **Non-mutating by default toward agent data roots** — do not rename, rewrite, or “fix” files under any Data root. **Exception (ADR 0008):** confirmed single-session delete via `AgentSessionStore.deleteSession` / UI Delete / `asv delete` only. Export **writes** only under a user-chosen output path.
 2. **No network required** for browse/export.
 3. **SwiftUI + Swift** for app and CLI — not Tauri, Electron, or a web UI stack (ADR 0001).
 4. **Non-sandboxed** local app for v1 (must read outside the app container).
@@ -101,10 +101,13 @@ Commands must remain discoverable via `asv --help` (overview + examples) and `as
 | `sessions [project-id]` | List sessions |
 | `show <session-id>` | Metadata **+ full conversation** (Readable by default; `--full` for full trace) |
 | `export <id>\|--all` | Full-trace JSON into a directory |
+| `delete <session-id>` | Permanently remove one session (`--yes` skips confirm) |
 
-Common flags: `--agent grok-build|claude-code|codex` (default `grok-build`), `--home <path>`, `--json` (list/projects/sessions/show), `--full` (`show`), `--out <dir>` (export).
+Common flags: `--agent grok-build|claude-code|codex` (default `grok-build`), `--home <path>`, `--json` (list/projects/sessions/show), `--full` (`show`), `--out <dir>` (export), `--yes` (`delete`).
 
 Export = **one JSON file per session**, full event trace, fields at least: `schema_version`, `agent` (`grok-build` / `claude-code` / `codex`), session info, `events[]`. Bulk export = directory of files (not zip in v1). One agent per command (no cross-agent list).
+
+Delete = remove that session’s primary artifact under the data root only (Grok directory; Claude/Codex jsonl). Paths outside the data root are refused.
 
 ---
 
@@ -117,6 +120,8 @@ Three columns (CC LOG–style, English):
 3. **Details** — Session info + **Conversation** (every message/event)  
 
 - **Session title:** summary → first user message → short id  
+- **Delete:** toolbar trash (and session context menu) with confirmation; removes selected session from disk  
+ 
 - **Readable mode** (default): coalesced turns; **Full trace** toolbar toggle: every event  
 - Load via `SessionTranscript.events(for:mode:)` from `updates.jsonl`  
 - **Agent picker** (toolbar): Grok Build | Claude Code | Codex — reloads that agent’s data root only  
@@ -198,7 +203,7 @@ Install product rules (ADR 0006):
 
 ## Out of scope (v1)
 
-Writing/deleting agent session files · live tail · zip bulk export · App Sandbox / Mac App Store · nested subagent UI · Cursor adapter · cross-agent search · web frontend
+Rewriting/renaming session files · bulk delete · live tail · zip bulk export · App Sandbox / Mac App Store · nested subagent UI · Cursor adapter · cross-agent search · web frontend
 
 ---
 
@@ -208,5 +213,5 @@ Writing/deleting agent session files · live tail · zip bulk export · App Sand
 |------|------|
 | [docs/SPEC.md](docs/SPEC.md) | Full product spec |
 | [CONTEXT.md](CONTEXT.md) | Ubiquitous language / glossary |
-| [docs/adr/](docs/adr/) | Why we chose SwiftUI, read-only, export shape, naming, CLI install |
+| [docs/adr/](docs/adr/) | Why we chose SwiftUI, session-delete exception, export shape, naming, CLI install |
 | [README.md](README.md) | Human install & command cheat sheet |

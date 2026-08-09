@@ -56,6 +56,15 @@ struct ContentView: View {
                 }
                 .help("Reload projects and sessions from disk")
             }
+            ToolbarItem(placement: .destructiveAction) {
+                Button(role: .destructive) {
+                    model.confirmDeleteSession = true
+                } label: {
+                    Label("Delete Session", systemImage: "trash")
+                }
+                .disabled(model.selectedSessionId == nil)
+                .help("Permanently delete the selected session from disk")
+            }
         }
         // One search field only — conversation full-text over every session.
         .searchable(text: $model.conversationQuery, prompt: "Search all conversations…")
@@ -80,6 +89,31 @@ struct ContentView: View {
             Button("OK", role: .cancel) { model.errorMessage = nil }
         } message: {
             Text(model.errorMessage ?? "")
+        }
+        .confirmationDialog(
+            "Delete session?",
+            isPresented: $model.confirmDeleteSession,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                model.deleteSelectedSession()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            if let session = model.selectedSession {
+                Text(
+                    """
+                    Permanently remove “\(session.title)” from this Mac?
+
+                    ID: \(session.id)
+                    Path: \(session.directoryPath)
+
+                    This cannot be undone. Stop the agent if it is still using this session.
+                    """
+                )
+            } else {
+                Text("Permanently remove the selected session from disk. This cannot be undone.")
+            }
         }
     }
 
@@ -133,6 +167,12 @@ struct ContentView: View {
         List(model.allSessionsSorted, selection: $model.selectedSessionId) { session in
             sessionRow(session)
                 .tag(session.id)
+                .contextMenu {
+                    Button("Delete Session…", role: .destructive) {
+                        model.selectedSessionId = session.id
+                        model.confirmDeleteSession = true
+                    }
+                }
         }
         .overlay {
             if model.allSessionsSorted.isEmpty {
@@ -156,6 +196,12 @@ struct ContentView: View {
             ForEach(model.searchResults) { hit in
                 searchHitRow(hit)
                     .tag(hit.session.id)
+                    .contextMenu {
+                        Button("Delete Session…", role: .destructive) {
+                            model.selectedSessionId = hit.session.id
+                            model.confirmDeleteSession = true
+                        }
+                    }
             }
         }
         .overlay {
@@ -485,6 +531,9 @@ final class AppModel: ObservableObject {
     @Published var searchResults: [ConversationSearchHit] = []
     @Published var isSearching = false
 
+    /// Drives the destructive delete confirmation dialog.
+    @Published var confirmDeleteSession = false
+
     private var store: any AgentSessionStore
     private var searchTask: Task<Void, Never>?
 
@@ -593,6 +642,20 @@ final class AppModel: ObservableObject {
             eventsError = error.localizedDescription
         }
         isLoadingEvents = false
+    }
+
+    /// Permanently delete the selected session from the data root, then refresh lists.
+    func deleteSelectedSession() {
+        guard let id = selectedSessionId else { return }
+        do {
+            _ = try store.deleteSession(id: id)
+            selectedSessionId = nil
+            events = []
+            eventsError = nil
+            refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func scheduleConversationSearch(immediate: Bool = false) {

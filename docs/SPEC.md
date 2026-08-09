@@ -9,7 +9,7 @@
 
 ## 1. Summary
 
-**Agent Session Viewer** is a local, read-only macOS app that visualizes coding-agent sessions on disk in a three-column UI (Projects → Sessions → Details), with a companion CLI **`asv`** for list/export.
+**Agent Session Viewer** is a local macOS app that visualizes coding-agent sessions on disk in a three-column UI (Projects → Sessions → Details), with a companion CLI **`asv`** for list/export/delete. Browse and export do not mutate agent data roots; delete permanently removes one session after confirmation (ADR 0008).
 
 - **Agents:** Grok Build (`~/.grok`), Claude Code (`~/.claude`), and Codex (`~/.codex`), selected via toolbar / CLI `--agent`.
 - **Future:** more Agents behind the same UI and Export bundle schema.
@@ -77,7 +77,8 @@
 | D3 | Discover Projects as child directories of `<data-root>/sessions/` (URL-encoded cwd groups per Grok layout). |
 | D4 | Discover Sessions as child directories containing Grok session artifacts (`summary.json`, etc.). |
 | D5 | Load is **snapshot-based**: on open, project/session select, or explicit Refresh. No FS watcher in v1. |
-| D6 | Never write to the Data root (read-only; ADR 0002). |
+| D6 | Do not rename, rewrite, or “fix” files under the Data root. **Exception:** confirmed single-session delete (D7 / ADR 0008). |
+| D7 | **Session delete:** resolve session by id, remove only that session’s primary artifact (`directoryPath`: Grok directory or Claude/Codex file). Refuse paths outside the Data root. No bulk wipe. |
 
 **Authoritative Grok sources (implementation reference):**
 
@@ -101,6 +102,7 @@
 | U10 | Subagent Sessions listed as **flat peers** under the Project. |
 | U11 | Export actions: export current Session; export all Sessions in current Project or all Projects (bulk → directory). |
 | U12 | English UI strings only. |
+| U13 | **Delete session:** when a Session is selected, offer Delete (toolbar and/or context menu). Require confirmation naming the session and path. On success, refresh lists and clear selection. |
 
 ### 6.3 Export
 
@@ -252,8 +254,9 @@ agent-session-viewer/
 3. `asv export --all --out /tmp/asv-out` writes one JSON file per Session with `schema_version` and `agent: "grok-build"`.
 4. `asv` runs when installed without the GUI.
 5. Installer package places the app in `/Applications` and `asv` in `/usr/local/bin` without manual copy; Releases ship the `.pkg` only.
-6. No code path deletes or rewrites files under Grok home.
+6. No code path renames/rewrites session files under agent homes except confirmed single-session delete (ADR 0008).
 7. UI strings are English; product name is Agent Session Viewer; CLI is `asv`.
+8. `asv delete <id> --yes` and the viewer Delete control remove only that session’s primary artifact after confirmation.
 
 ---
 

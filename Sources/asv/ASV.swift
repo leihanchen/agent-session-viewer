@@ -1,15 +1,17 @@
 import ArgumentParser
 import AgentSessionCore
+import Darwin
 import Foundation
 
 @main
 struct ASV: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "asv",
-        abstract: "Agent Session Viewer — list and export local coding-agent sessions (read-only).",
+        abstract: "Agent Session Viewer — list, export, and delete local coding-agent sessions.",
         discussion: """
-        Browse coding-agent sessions on disk (Grok Build, Claude Code) and export
-        portable JSON bundles. Does not modify anything under the data root.
+        Browse coding-agent sessions on disk (Grok Build, Claude Code, Codex) and export
+        portable JSON bundles. By default ASV only reads the data root; the delete
+        command permanently removes one session’s files (requires confirmation).
 
         COMMANDS
           list                  Overview of projects and session counts (default)
@@ -17,6 +19,7 @@ struct ASV: ParsableCommand {
           sessions [project]    List sessions, optionally for one project id
           show <session-id>     Show metadata and full conversation for a session
           export <id>|--all     Write full-trace JSON file(s) into a directory
+          delete <session-id>   Permanently remove one session from disk
 
         GLOBAL OPTIONS (most commands)
           --agent <name>        grok-build (default) | claude-code | codex
@@ -36,6 +39,8 @@ struct ASV: ParsableCommand {
           asv show <claude-session-id> --agent claude-code
           asv show <codex-session-id> --agent codex
           asv export --all --agent codex --out ./out
+          asv delete <session-id> --yes
+          asv delete <session-id> --agent claude-code --yes
 
         GETTING HELP FOR ONE COMMAND
           asv list --help
@@ -43,6 +48,7 @@ struct ASV: ParsableCommand {
           asv sessions --help
           asv show --help
           asv export --help
+          asv delete --help
           asv help <command>
         """,
         version: ASVVersion.current,
@@ -52,6 +58,7 @@ struct ASV: ParsableCommand {
             SessionsCommand.self,
             ShowCommand.self,
             ExportCommand.self,
+            DeleteCommand.self,
         ],
         defaultSubcommand: ListCommand.self
     )
@@ -406,6 +413,80 @@ struct ExportCommand: ParsableCommand {
             print(url.path)
         }
         print("Exported \(written.count) session(s) → \(outURL.path)", to: &StandardError.stream)
+    }
+}
+
+// MARK: - delete
+
+struct DeleteCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "delete",
+        abstract: "Permanently delete one session from the local data root.",
+        discussion: """
+        Looks up a session by id and removes its on-disk artifacts (Grok: session
+        directory; Claude/Codex: session jsonl file). This cannot be undone.
+
+        Without --yes, prints session details and requires typing "delete" to confirm.
+        Non-interactive use must pass --yes.
+
+        USAGE
+          asv delete <session-id> [--agent <name>] [--home <path>] [--yes]
+
+        ARGUMENTS
+          <session-id>    Required. Session id (directory name / UUID)
+
+        OPTIONS
+          --agent <name>  grok-build (default) | claude-code | codex
+          --home <path>   Data root override
+          --yes           Skip interactive confirmation (required for scripts / no TTY)
+
+        EXAMPLES
+          asv delete 019f623a-a8d1-7591-beff-c41fc716b171 --yes
+          asv delete <id> --agent claude-code --yes
+          asv delete <id> --agent codex --home ~/.codex --yes
+        """
+    )
+
+    @OptionGroup var homeOptions: HomeOptions
+    @Argument(help: "Session id to delete.")
+    var sessionId: String
+    @Flag(name: .long, help: "Skip confirmation and delete immediately.")
+    var yes = false
+
+    func run() throws {
+        let store = try homeOptions.makeStore()
+        let session = try store.session(id: sessionId)
+
+        if !yes {
+            print("About to permanently delete this session:", to: &StandardError.stream)
+            print("  agent: \(session.agent.displayName) (\(session.agent.rawValue))", to: &StandardError.stream)
+            print("  id:    \(session.id)", to: &StandardError.stream)
+            print("  title: \(session.title)", to: &StandardError.stream)
+            print("  path:  \(session.directoryPath)", to: &StandardError.stream)
+            print("This cannot be undone.", to: &StandardError.stream)
+
+            guard isatty(STDIN_FILENO) != 0 else {
+                print(
+                    "Non-interactive terminal: pass --yes to confirm deletion.",
+                    to: &StandardError.stream
+                )
+                throw ExitCode(1)
+            }
+
+            print("Type 'delete' to confirm: ", terminator: "", to: &StandardError.stream)
+            fflush(stderr)
+            guard let line = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  line == "delete"
+            else {
+                print("Aborted.", to: &StandardError.stream)
+                throw ExitCode(1)
+            }
+        }
+
+        let result = try store.deleteSession(id: sessionId)
+        print("Deleted \(result.sessionId)")
+        print("  agent: \(result.agent.rawValue)")
+        print("  path:  \(result.deletedPath)")
     }
 }
 

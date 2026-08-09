@@ -183,11 +183,84 @@ struct ASVCheck {
             failures += 1
         }
 
+        // Session delete (mutate temp copies only — never fixture trees)
+        do {
+            let home = try copyTree(fixtureGrokHome())
+            defer { try? FileManager.default.removeItem(at: home) }
+            let catalog = GrokCatalog(dataRoot: home)
+            let id = "sess-aaa-1111-1111-1111-111111111111"
+            let session = try catalog.session(id: id)
+            let path = session.directoryPath
+            let result = try catalog.deleteSession(id: id)
+            let remaining = try catalog.listSessions().count
+            let gone = (try? catalog.session(id: id)) == nil
+            expect(result.sessionId == id, "grok delete result id")
+            expect(!FileManager.default.fileExists(atPath: path), "grok session dir removed")
+            expect(gone, "grok session gone after delete")
+            expect(remaining == 1, "grok sibling session remains")
+        } catch {
+            fputs("FAIL: grok delete threw \(error)\n", stderr)
+            failures += 1
+        }
+
+        do {
+            let home = try copyTree(fixtureClaudeHome())
+            defer { try? FileManager.default.removeItem(at: home) }
+            let store = ClaudeCatalog(dataRoot: home)
+            let id = "sess-cc-1111-1111-1111-111111111111"
+            let path = try store.session(id: id).directoryPath
+            _ = try store.deleteSession(id: id)
+            let remaining = try store.listSessions().count
+            expect(!FileManager.default.fileExists(atPath: path), "claude jsonl removed")
+            expect(remaining == 0, "claude list empty after delete")
+        } catch {
+            fputs("FAIL: claude delete threw \(error)\n", stderr)
+            failures += 1
+        }
+
+        do {
+            let home = try copyTree(fixtureCodexHome())
+            defer { try? FileManager.default.removeItem(at: home) }
+            let store = CodexCatalog(dataRoot: home)
+            let id = "019fa3e1-4f4b-75d3-aaec-0f06740b6e9f"
+            let path = try store.session(id: id).directoryPath
+            _ = try store.deleteSession(id: id)
+            let remaining = try store.listSessions().count
+            expect(!FileManager.default.fileExists(atPath: path), "codex rollout removed")
+            expect(remaining == 0, "codex list empty after delete")
+        } catch {
+            fputs("FAIL: codex delete threw \(error)\n", stderr)
+            failures += 1
+        }
+
+        // Path safety
+        expect(
+            SessionDeleter.isStrictlyUnder(
+                child: URL(fileURLWithPath: "/tmp/root/a"),
+                parent: URL(fileURLWithPath: "/tmp/root")
+            ),
+            "strictly under true"
+        )
+        expect(
+            !SessionDeleter.isStrictlyUnder(
+                child: URL(fileURLWithPath: "/tmp/root-evil"),
+                parent: URL(fileURLWithPath: "/tmp/root")
+            ),
+            "strictly under false for prefix sibling"
+        )
+
         if failures > 0 {
             fputs("\n\(failures) failure(s)\n", stderr)
             exit(1)
         }
         print("\nAll checks passed.")
+    }
+
+    static func copyTree(_ src: URL) throws -> URL {
+        let dest = FileManager.default.temporaryDirectory
+            .appendingPathComponent("asv-check-del-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.copyItem(at: src, to: dest)
+        return dest
     }
 
     /// Resolve Fixtures/grok-home relative to the package (works from `swift run`).
