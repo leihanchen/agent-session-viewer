@@ -120,7 +120,8 @@ Three columns (CC LOG–style, English):
 3. **Details** — Session info + **Conversation** (every message/event)  
 
 - **Session title:** summary → first user message → short id  
-- **Delete:** toolbar trash (and session context menu) with confirmation; removes selected session from disk  
+- **Delete:** toolbar trash (and session context menu) with confirmation; multi-select with ⌘-click / Shift-click range, then delete all selected  
+ 
  
 - **Readable mode** (default): coalesced turns; **Full trace** toolbar toggle: every event  
 - Load via `SessionTranscript.events(for:mode:)` from `updates.jsonl`  

@@ -94,6 +94,8 @@ asv show <session-id> --json
 
 **Delete:** removes the session’s primary local artifact (Grok: session directory; Claude/Codex: jsonl). Irreversible. Prefer stopping the agent if that session is still active.
 
+In the **viewer**, select one or more sessions in the Sessions list (**click**, **⌘-click** to toggle, **Shift-click** for a range), then use the trash toolbar button or context menu to delete them together after confirmation.
+
 Export JSON includes `"agent": "grok-build"`, `"claude-code"`, or `"codex"`.
 
 ## macOS app (dev)

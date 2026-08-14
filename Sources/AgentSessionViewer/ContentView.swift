@@ -60,10 +60,10 @@ struct ContentView: View {
                 Button(role: .destructive) {
                     model.confirmDeleteSession = true
                 } label: {
-                    Label("Delete Session", systemImage: "trash")
+                    Label(model.deleteToolbarTitle, systemImage: "trash")
                 }
-                .disabled(model.selectedSessionId == nil)
-                .help("Permanently delete the selected session from disk")
+                .disabled(model.selectedSessionIds.isEmpty)
+                .help("Delete selected sessions (click, ⌘-click, or Shift-click to select)")
             }
         }
         // One search field only — conversation full-text over every session.
@@ -72,14 +72,14 @@ struct ContentView: View {
             model.scheduleConversationSearch()
         }
         .onAppear { model.refresh() }
-        .onChange(of: model.selectedSessionId) { _, _ in
+        .onChange(of: model.selectedSessionIds) { _, _ in
             model.reloadEvents()
         }
         .onChange(of: model.selectedProjectId) { _, projectId in
             // Browse only: jump to that project's sessions (search is always global).
             guard !model.isSearchActive, let projectId else { return }
             if let first = model.sessions.first(where: { $0.projectId == projectId }) {
-                model.selectedSessionId = first.id
+                model.selectedSessionIds = [first.id]
             }
         }
         .alert("Error", isPresented: Binding(
@@ -91,29 +91,16 @@ struct ContentView: View {
             Text(model.errorMessage ?? "")
         }
         .confirmationDialog(
-            "Delete session?",
+            model.deleteConfirmTitle,
             isPresented: $model.confirmDeleteSession,
             titleVisibility: .visible
         ) {
-            Button("Delete", role: .destructive) {
-                model.deleteSelectedSession()
+            Button(model.deleteConfirmActionTitle, role: .destructive) {
+                model.deleteSelectedSessions()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            if let session = model.selectedSession {
-                Text(
-                    """
-                    Permanently remove “\(session.title)” from this Mac?
-
-                    ID: \(session.id)
-                    Path: \(session.directoryPath)
-
-                    This cannot be undone. Stop the agent if it is still using this session.
-                    """
-                )
-            } else {
-                Text("Permanently remove the selected session from disk. This cannot be undone.")
-            }
+            Text(model.deleteConfirmMessage)
         }
     }
 
@@ -164,13 +151,13 @@ struct ContentView: View {
 
     private var browseSessionsList: some View {
         // Always list every session (not gated on project selection).
-        List(model.allSessionsSorted, selection: $model.selectedSessionId) { session in
+        // Set selection enables macOS multi-select: ⌘-click toggle, Shift-click range.
+        List(model.allSessionsSorted, selection: $model.selectedSessionIds) { session in
             sessionRow(session)
                 .tag(session.id)
                 .contextMenu {
-                    Button("Delete Session…", role: .destructive) {
-                        model.selectedSessionId = session.id
-                        model.confirmDeleteSession = true
+                    Button(model.contextDeleteTitle(for: session.id), role: .destructive) {
+                        model.prepareDelete(fromContextMenuOn: session.id)
                     }
                 }
         }
@@ -182,7 +169,7 @@ struct ContentView: View {
     }
 
     private var searchResultsList: some View {
-        List(selection: $model.selectedSessionId) {
+        List(selection: $model.selectedSessionIds) {
             if model.isSearching {
                 HStack {
                     ProgressView()
@@ -197,9 +184,8 @@ struct ContentView: View {
                 searchHitRow(hit)
                     .tag(hit.session.id)
                     .contextMenu {
-                        Button("Delete Session…", role: .destructive) {
-                            model.selectedSessionId = hit.session.id
-                            model.confirmDeleteSession = true
+                        Button(model.contextDeleteTitle(for: hit.session.id), role: .destructive) {
+                            model.prepareDelete(fromContextMenuOn: hit.session.id)
                         }
                     }
             }
@@ -221,16 +207,25 @@ struct ContentView: View {
                 if model.isSearching {
                     Text("Searching all conversations…")
                 } else {
-                    Text("\(model.searchResults.count) of \(model.sessions.count) sessions matched")
+                    Text(footerLine(
+                        base: "\(model.searchResults.count) of \(model.sessions.count) sessions matched"
+                    ))
                 }
             } else {
-                Text("\(model.sessions.count) sessions (all projects)")
+                Text(footerLine(base: "\(model.sessions.count) sessions (all projects)"))
             }
         }
         .font(.caption)
         .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity)
         .padding(8)
+    }
+
+    private func footerLine(base: String) -> String {
+        let n = model.selectedSessionIds.count
+        if n == 0 { return base }
+        if n == 1 { return "\(base) · 1 selected" }
+        return "\(base) · \(n) selected"
     }
 
     private func sessionRow(_ session: SessionInfo) -> some View {
@@ -294,7 +289,9 @@ struct ContentView: View {
 
     private var detailColumn: some View {
         Group {
-            if let session = model.selectedSession {
+            if model.selectedSessionIds.count > 1 {
+                multiSelectDetail
+            } else if let session = model.selectedSession {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
@@ -312,10 +309,50 @@ struct ContentView: View {
                     }
                 }
             } else {
-                ContentUnavailableView("Select a session", systemImage: "doc.text")
+                ContentUnavailableView(
+                    "Select a session",
+                    systemImage: "doc.text",
+                    description: Text("Click a session, or use ⌘-click / Shift-click to select several.")
+                )
             }
         }
         .navigationTitle("Details")
+    }
+
+    private var multiSelectDetail: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("\(model.selectedSessionIds.count) sessions selected")
+                    .font(.title2.weight(.semibold))
+                Text("Conversation is shown when exactly one session is selected. Use Delete to remove all selected sessions at once.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(model.selectedSessions) { session in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(session.title)
+                                .font(.body.weight(.medium))
+                                .lineLimit(2)
+                            Text(session.id)
+                                .font(.caption2.monospaced())
+                                .foregroundStyle(.secondary)
+                            Text(session.projectPath)
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        .padding(.vertical, 4)
+                        Divider()
+                    }
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12))
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private func scrollToFirstMatch(proxy: ScrollViewProxy) {
@@ -517,7 +554,8 @@ final class AppModel: ObservableObject {
     @Published var projects: [Project] = []
     @Published var sessions: [SessionInfo] = []
     @Published var selectedProjectId: Project.ID?
-    @Published var selectedSessionId: SessionInfo.ID?
+    /// Multi-select (macOS List: click, ⌘-click toggle, Shift-click range).
+    @Published var selectedSessionIds: Set<SessionInfo.ID> = []
     @Published var dataRootPath: String = ""
     @Published var errorMessage: String?
 
@@ -547,7 +585,7 @@ final class AppModel: ObservableObject {
     func switchAgent() {
         store = AgentStoreFactory.make(agent: selectedAgent)
         selectedProjectId = nil
-        selectedSessionId = nil
+        selectedSessionIds = []
         conversationQuery = ""
         searchResults = []
         events = []
@@ -579,13 +617,90 @@ final class AppModel: ObservableObject {
         }
     }
 
-    var selectedSession: SessionInfo? {
-        guard let selectedSessionId else { return nil }
+    /// Visible list order (browse or search) — used for multi-select summary and confirm copy.
+    var visibleSessions: [SessionInfo] {
         if isSearchActive {
-            return searchResults.first(where: { $0.session.id == selectedSessionId })?.session
-                ?? sessions.first { $0.id == selectedSessionId }
+            return searchResults.map(\.session)
         }
-        return sessions.first { $0.id == selectedSessionId }
+        return allSessionsSorted
+    }
+
+    /// Selected sessions in **visible list order**.
+    var selectedSessions: [SessionInfo] {
+        let ids = selectedSessionIds
+        return visibleSessions.filter { ids.contains($0.id) }
+    }
+
+    /// Conversation detail only when exactly one session is selected.
+    var selectedSession: SessionInfo? {
+        guard selectedSessionIds.count == 1, let id = selectedSessionIds.first else { return nil }
+        if isSearchActive {
+            return searchResults.first(where: { $0.session.id == id })?.session
+                ?? sessions.first { $0.id == id }
+        }
+        return sessions.first { $0.id == id }
+    }
+
+    var deleteToolbarTitle: String {
+        let n = selectedSessionIds.count
+        if n <= 1 { return "Delete Session" }
+        return "Delete \(n) Sessions"
+    }
+
+    var deleteConfirmTitle: String {
+        let n = selectedSessionIds.count
+        if n <= 1 { return "Delete session?" }
+        return "Delete \(n) sessions?"
+    }
+
+    var deleteConfirmActionTitle: String {
+        let n = selectedSessionIds.count
+        if n <= 1 { return "Delete" }
+        return "Delete \(n) Sessions"
+    }
+
+    var deleteConfirmMessage: String {
+        let selected = selectedSessions
+        guard !selected.isEmpty else {
+            return "Permanently remove the selected session(s) from disk. This cannot be undone."
+        }
+        if selected.count == 1, let session = selected.first {
+            return """
+            Permanently remove “\(session.title)” from this Mac?
+
+            ID: \(session.id)
+            Path: \(session.directoryPath)
+
+            This cannot be undone. Stop the agent if it is still using this session.
+            """
+        }
+        let previewLimit = 5
+        var lines = selected.prefix(previewLimit).map { "• \($0.title)" }
+        if selected.count > previewLimit {
+            lines.append("• …and \(selected.count - previewLimit) more")
+        }
+        return """
+        Permanently remove \(selected.count) sessions from this Mac?
+
+        \(lines.joined(separator: "\n"))
+
+        This cannot be undone. Stop agents that are still using these sessions.
+        """
+    }
+
+    func contextDeleteTitle(for sessionId: SessionInfo.ID) -> String {
+        if selectedSessionIds.contains(sessionId), selectedSessionIds.count > 1 {
+            return "Delete \(selectedSessionIds.count) Sessions…"
+        }
+        return "Delete Session…"
+    }
+
+    /// Finder-like: if the row is already part of a multi-selection, keep it; otherwise select only that row.
+    func prepareDelete(fromContextMenuOn sessionId: SessionInfo.ID) {
+        if !selectedSessionIds.contains(sessionId) || selectedSessionIds.count <= 1 {
+            selectedSessionIds = [sessionId]
+        }
+        confirmDeleteSession = true
     }
 
     var firstMatchingEventId: String? {
@@ -607,11 +722,9 @@ final class AppModel: ObservableObject {
             sessions = try store.listSessions(projectId: nil)
             if let selectedProjectId, !projects.contains(where: { $0.id == selectedProjectId }) {
                 self.selectedProjectId = nil
-                self.selectedSessionId = nil
+                selectedSessionIds = []
             }
-            if let selectedSessionId, !sessions.contains(where: { $0.id == selectedSessionId }) {
-                self.selectedSessionId = nil
-            }
+            pruneSelection(toKnown: Set(sessions.map(\.id)))
             reloadEvents()
             if isSearchActive {
                 scheduleConversationSearch(immediate: true)
@@ -621,8 +734,13 @@ final class AppModel: ObservableObject {
             sessions = []
             events = []
             searchResults = []
+            selectedSessionIds = []
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func pruneSelection(toKnown known: Set<SessionInfo.ID>) {
+        selectedSessionIds = selectedSessionIds.intersection(known)
     }
 
     func reloadEvents() {
@@ -644,17 +762,34 @@ final class AppModel: ObservableObject {
         isLoadingEvents = false
     }
 
-    /// Permanently delete the selected session from the data root, then refresh lists.
-    func deleteSelectedSession() {
-        guard let id = selectedSessionId else { return }
-        do {
-            _ = try store.deleteSession(id: id)
-            selectedSessionId = nil
-            events = []
-            eventsError = nil
-            refresh()
-        } catch {
-            errorMessage = error.localizedDescription
+    /// Permanently delete all selected sessions from the data root, then refresh lists.
+    func deleteSelectedSessions() {
+        let ids = Array(selectedSessionIds)
+        guard !ids.isEmpty else { return }
+
+        var deleted = 0
+        var failures: [(String, String)] = []
+        for id in ids {
+            do {
+                _ = try store.deleteSession(id: id)
+                deleted += 1
+            } catch {
+                failures.append((id, error.localizedDescription))
+            }
+        }
+
+        selectedSessionIds = []
+        events = []
+        eventsError = nil
+        refresh()
+
+        if !failures.isEmpty {
+            let failedIds = failures.map(\.0).joined(separator: ", ")
+            if deleted == 0 {
+                errorMessage = "Could not delete any sessions. \(failures.first?.1 ?? "")"
+            } else {
+                errorMessage = "Deleted \(deleted) of \(ids.count). Failed: \(failedIds)"
+            }
         }
     }
 
@@ -693,13 +828,16 @@ final class AppModel: ObservableObject {
                 guard self.trimmedQuery == q, self.selectedAgent == agent else { return }
                 self.searchResults = hits
                 self.isSearching = false
-                if let sel = self.selectedSessionId, hits.contains(where: { $0.session.id == sel }) {
+                let hitIds = Set(hits.map(\.session.id))
+                let kept = self.selectedSessionIds.intersection(hitIds)
+                if !kept.isEmpty {
+                    self.selectedSessionIds = kept
                     self.reloadEvents()
                 } else if let first = hits.first {
-                    self.selectedSessionId = first.session.id
+                    self.selectedSessionIds = [first.session.id]
                     self.reloadEvents()
                 } else {
-                    self.selectedSessionId = nil
+                    self.selectedSessionIds = []
                     self.events = []
                 }
             }

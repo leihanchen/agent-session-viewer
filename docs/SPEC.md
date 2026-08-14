@@ -102,7 +102,7 @@
 | U10 | Subagent Sessions listed as **flat peers** under the Project. |
 | U11 | Export actions: export current Session; export all Sessions in current Project or all Projects (bulk → directory). |
 | U12 | English UI strings only. |
-| U13 | **Delete session:** when a Session is selected, offer Delete (toolbar and/or context menu). Require confirmation naming the session and path. On success, refresh lists and clear selection. |
+| U13 | **Delete session(s):** Sessions list supports multi-select (macOS: click, ⌘-click toggle, Shift-click range). Delete (toolbar and/or context menu) removes **all** selected sessions after one confirmation. On success, refresh lists and clear selection. |
 
 ### 6.3 Export
 
