@@ -27,6 +27,8 @@ public enum SessionTranscript {
         case .codex:
             let file = URL(fileURLWithPath: session.directoryPath)
             return try CodexTranscript.loadEvents(from: file)
+        case .warp:
+            return try WarpTranscript.loadEvents(locator: session.directoryPath)
         }
     }
 

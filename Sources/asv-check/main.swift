@@ -183,6 +183,39 @@ struct ASVCheck {
             failures += 1
         }
 
+        // Warp fixture
+        let warpHome = fixtureWarpHome()
+        expect(FileManager.default.fileExists(atPath: warpHome.appendingPathComponent("warp.sqlite").path), "warp fixture exists")
+        do {
+            let store = WarpCatalog(dataRoot: warpHome)
+            expect(store.agent == .warp, "warp agent kind")
+            let projects = try store.listProjects()
+            expect(projects.count == 1, "warp 1 project (got \(projects.count))")
+            let sessions = try store.listSessions(projectId: nil)
+            expect(sessions.count == 2, "warp 2 sessions (got \(sessions.count))")
+            let sid = "sess-warp-1111-1111-1111-111111111111"
+            let s = try store.session(id: sid)
+            expect(s.title == "Warp fixture demo", "warp title from summary")
+            expect(s.agent == .warp, "session agent warp")
+            expect(s.projectPath == "/Users/demo/warp-proj", "warp cwd from summary")
+            let events = try store.loadEvents(session: s)
+            expect(events.contains(where: { $0.type == "user" && ($0.content ?? "").contains("hello world") }), "warp has user query")
+            expect(events.count == 2, "warp sess-1111 has 2 user events (got \(events.count))")
+            let hits = ConversationSearch.search(sessions: sessions, query: "sqlite parser") {
+                try store.loadEvents(session: $0)
+            }
+            expect(hits.count == 1, "warp search hit")
+            let exportURL = try SessionExporter.exportSession(
+                session: s,
+                to: FileManager.default.temporaryDirectory.appendingPathComponent("asv-warp-\(UUID().uuidString)", isDirectory: true)
+            )
+            let obj = try JSONSerialization.jsonObject(with: Data(contentsOf: exportURL)) as? [String: Any]
+            expect(obj?["agent"] as? String == "warp", "export agent warp")
+        } catch {
+            fputs("FAIL: warp catalog threw \(error)\n", stderr)
+            failures += 1
+        }
+
         // Session delete (mutate temp copies only — never fixture trees)
         do {
             let home = try copyTree(fixtureGrokHome())
@@ -233,6 +266,22 @@ struct ASVCheck {
             failures += 1
         }
 
+        do {
+            let home = try copyTree(fixtureWarpHome())
+            defer { try? FileManager.default.removeItem(at: home) }
+            let store = WarpCatalog(dataRoot: home)
+            let id = "sess-warp-1111-1111-1111-111111111111"
+            let dbPath = home.appendingPathComponent("warp.sqlite").path
+            _ = try store.deleteSession(id: id)
+            expect(FileManager.default.fileExists(atPath: dbPath), "warp sqlite file remains after row delete")
+            expect((try? store.session(id: id)) == nil, "warp session gone after delete")
+            let remaining = try store.listSessions().count
+            expect(remaining == 1, "warp sibling conversation remains")
+        } catch {
+            fputs("FAIL: warp delete threw \(error)\n", stderr)
+            failures += 1
+        }
+
         // Path safety
         expect(
             SessionDeleter.isStrictlyUnder(
@@ -274,6 +323,10 @@ struct ASVCheck {
 
     static func fixtureCodexHome() -> URL {
         fixturesRoot().appendingPathComponent("codex-home", isDirectory: true)
+    }
+
+    static func fixtureWarpHome() -> URL {
+        fixturesRoot().appendingPathComponent("warp-home", isDirectory: true)
     }
 
     static func fixturesRoot() -> URL {

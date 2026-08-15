@@ -4,7 +4,7 @@ Local **macOS** browser for coding-agent sessions, with companion CLI **`asv`**.
 
 | | |
 |--|--|
-| **Agents** | **Grok Build**, **Claude Code**, and **Codex** (toolbar picker / CLI `--agent`) |
+| **Agents** | **Grok Build**, **Claude Code**, **Codex**, and **Warp** (toolbar picker / CLI `--agent`) |
 | **UI** | SwiftUI three-column browser (Projects → Sessions → Conversation) |
 | **CLI** | `list` / `projects` / `sessions` / `show` / `export` / `delete` |
 
@@ -21,10 +21,11 @@ See [docs/SPEC.md](docs/SPEC.md) (requirements), [AGENTS.md](AGENTS.md) (coding-
 | **Grok Build** | `grok-build` | `~/.grok` | `$GROK_HOME` |
 | **Claude Code** | `claude-code` | `~/.claude` | `$CLAUDE_CONFIG_DIR` or `$CLAUDE_HOME` |
 | **Codex** | `codex` | `~/.codex` | `$CODEX_HOME` |
+| **Warp** | `warp` | `~/Library/Group Containers/2BBY89MBSN.dev.warp/Library/Application Support/dev.warp.Warp-Stable` | `$WARP_HOME` or `$WARP_DIR` |
 
 - **App:** segmented control in the toolbar selects the active agent; projects, sessions, conversation, and search apply to **that agent only**.
-- **CLI:** pass `--agent grok-build` (default), `claude-code`, or `codex`. Optional `--home <path>` overrides that agent’s data root.
-- On-disk layouts differ (Grok: `sessions/<cwd>/<id>/`; Claude: `projects/<cwd>/<id>.jsonl`; Codex: `sessions/YYYY/MM/DD/rollout-*-<id>.jsonl`). All normalize into the same UI/export model. See [ADR 0007](docs/adr/0007-multi-agent-session-stores.md).
+- **CLI:** pass `--agent grok-build` (default), `claude-code`, `codex`, or `warp`. Optional `--home <path>` overrides that agent’s data root.
+- On-disk layouts differ (Grok: `sessions/<cwd>/<id>/`; Claude: `projects/<cwd>/<id>.jsonl`; Codex: `sessions/YYYY/MM/DD/rollout-*-<id>.jsonl`; Warp: rows in `warp.sqlite`). All normalize into the same UI/export model. See [ADR 0007](docs/adr/0007-multi-agent-session-stores.md) and [ADR 0009](docs/adr/0009-warp-sqlite-store.md).
 
 ## Requirements
 
@@ -70,6 +71,11 @@ asv show <session-id> --agent claude-code
 asv export --all --agent claude-code --out ./out
 asv delete <session-id> --agent claude-code --yes
 
+# Warp
+asv list --agent warp
+asv show <conversation-id> --agent warp
+asv delete <conversation-id> --agent warp --yes
+
 # Codex
 asv list --agent codex
 asv sessions --agent codex
@@ -86,13 +92,13 @@ asv show <session-id> --json
 
 | Flag | Meaning |
 |------|---------|
-| `--agent` | `grok-build` (default), `claude-code`, or `codex` |
+| `--agent` | `grok-build` (default), `claude-code`, `codex`, or `warp` |
 | `--home` | Override data root for that agent |
 | `--json` | Machine-readable output (`list` / `projects` / `sessions` / `show`) |
 | `--full` | Full event trace on `show` (default is readable/coalesced) |
 | `--yes` | Skip interactive confirmation on `delete` (required for non-TTY) |
 
-**Delete:** removes the session’s primary local artifact (Grok: session directory; Claude/Codex: jsonl). Irreversible. Prefer stopping the agent if that session is still active.
+**Delete:** removes the session’s primary local artifact (Grok: session directory; Claude/Codex: jsonl; Warp: that conversation’s rows in `warp.sqlite`, not the whole database). Irreversible. Prefer stopping the agent if that session is still active.
 
 In the **viewer**, select one or more sessions in the Sessions list (**click**, **⌘-click** to toggle, **Shift-click** for a range), then use the trash toolbar button or context menu to delete them together after confirmation.
 

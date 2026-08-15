@@ -18,7 +18,10 @@ let package = Package(
     targets: [
         .target(
             name: "AgentSessionCore",
-            path: "Sources/AgentSessionCore"
+            path: "Sources/AgentSessionCore",
+            linkerSettings: [
+                .linkedLibrary("sqlite3"),
+            ]
         ),
         .executableTarget(
             name: "asv",

@@ -15,7 +15,7 @@ Instructions for AI coding agents working in **this repository**. Keep changes a
 | Shared library | `AgentSessionCore` |
 
 - **English UI only**
-- **Agent stores:** Grok Build (`~/.grok`), Claude Code (`~/.claude`), Codex (`~/.codex`); toolbar picker + CLI `--agent`
+- **Agent stores:** Grok Build (`~/.grok`), Claude Code (`~/.claude`), Codex (`~/.codex`), Warp (`warp.sqlite` in the Warp-Stable group container); toolbar picker + CLI `--agent`
 - **Future agents:** add `AgentSessionStore` under `Sources/AgentSessionCore/<Agent>/`
 - **Not:** a website, WebView app, cloud service, or session editor
 
@@ -23,7 +23,7 @@ Instructions for AI coding agents working in **this repository**. Keep changes a
 
 ## Hard rules (do not violate)
 
-1. **Non-mutating by default toward agent data roots** — do not rename, rewrite, or “fix” files under any Data root. **Exception (ADR 0008):** confirmed single-session delete via `AgentSessionStore.deleteSession` / UI Delete / `asv delete` only. Export **writes** only under a user-chosen output path.
+1. **Non-mutating by default toward agent data roots** — do not rename, rewrite, or “fix” files under any Data root. **Exception (ADR 0008 / 0009):** confirmed session delete via `AgentSessionStore.deleteSession` / UI Delete / `asv delete` only. Warp delete is SQL row delete inside `warp.sqlite` — never remove the database file. Export **writes** only under a user-chosen output path.
 2. **No network required** for browse/export.
 3. **SwiftUI + Swift** for app and CLI — not Tauri, Electron, or a web UI stack (ADR 0001).
 4. **Non-sandboxed** local app for v1 (must read outside the app container).
@@ -103,11 +103,11 @@ Commands must remain discoverable via `asv --help` (overview + examples) and `as
 | `export <id>\|--all` | Full-trace JSON into a directory |
 | `delete <session-id>` | Permanently remove one session (`--yes` skips confirm) |
 
-Common flags: `--agent grok-build|claude-code|codex` (default `grok-build`), `--home <path>`, `--json` (list/projects/sessions/show), `--full` (`show`), `--out <dir>` (export), `--yes` (`delete`).
+Common flags: `--agent grok-build|claude-code|codex|warp` (default `grok-build`), `--home <path>`, `--json` (list/projects/sessions/show), `--full` (`show`), `--out <dir>` (export), `--yes` (`delete`).
 
-Export = **one JSON file per session**, full event trace, fields at least: `schema_version`, `agent` (`grok-build` / `claude-code` / `codex`), session info, `events[]`. Bulk export = directory of files (not zip in v1). One agent per command (no cross-agent list).
+Export = **one JSON file per session**, full event trace, fields at least: `schema_version`, `agent` (`grok-build` / `claude-code` / `codex` / `warp`), session info, `events[]`. Bulk export = directory of files (not zip in v1). One agent per command (no cross-agent list).
 
-Delete = remove that session’s primary artifact under the data root only (Grok directory; Claude/Codex jsonl). Paths outside the data root are refused.
+Delete = remove that session’s primary artifact under the data root only (Grok directory; Claude/Codex jsonl; Warp conversation rows). Paths outside the data root are refused (file-backed agents).
 
 ---
 
@@ -168,6 +168,19 @@ Three columns (CC LOG–style, English):
 - Group projects by `session_meta.cwd`
 - Adapter: `CodexCatalog` / `CodexTranscript`
 - Do not require SQLite logs for MVP
+
+### Warp
+
+```
+<data-root>/warp.sqlite
+```
+
+- Default: `$WARP_HOME` / `$WARP_DIR` or macOS `…/Group Containers/2BBY89MBSN.dev.warp/…/dev.warp.Warp-Stable/`
+- Discover `agent_conversations`; user turns from `ai_queries` (`Query.text`)
+- Group projects by `summary.initial_working_directory`
+- Adapter: `WarpCatalog` / `WarpTranscript`
+- Delete = SQL `DELETE` for that `conversation_id` (ADR 0009). Never `rm` `warp.sqlite`.
+- Do not decode `agent_tasks` protobuf in v1
 
 All implement `AgentSessionStore` via `AgentStoreFactory`. 
 

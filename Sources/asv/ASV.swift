@@ -9,7 +9,7 @@ struct ASV: ParsableCommand {
         commandName: "asv",
         abstract: "Agent Session Viewer — list, export, and delete local coding-agent sessions.",
         discussion: """
-        Browse coding-agent sessions on disk (Grok Build, Claude Code, Codex) and export
+        Browse coding-agent sessions on disk (Grok Build, Claude Code, Codex, Warp) and export
         portable JSON bundles. By default ASV only reads the data root; the delete
         command permanently removes one session’s files (requires confirmation).
 
@@ -22,9 +22,10 @@ struct ASV: ParsableCommand {
           delete <session-id>   Permanently remove one session from disk
 
         GLOBAL OPTIONS (most commands)
-          --agent <name>        grok-build (default) | claude-code | codex
+          --agent <name>        grok-build (default) | claude-code | codex | warp
           --home <path>         Agent data root override
-                                (Grok: ~/.grok; Claude: ~/.claude; Codex: ~/.codex)
+                                (Grok: ~/.grok; Claude: ~/.claude; Codex: ~/.codex;
+                                 Warp: group-container Warp-Stable / warp.sqlite)
           --json                Machine-readable JSON on stdout (list/projects/sessions/show)
           -h, --help            Show help for asv or a subcommand
           --version             Print version
@@ -38,9 +39,11 @@ struct ASV: ParsableCommand {
           asv show 019f623a-a8d1-7591-beff-c41fc716b171
           asv show <claude-session-id> --agent claude-code
           asv show <codex-session-id> --agent codex
+          asv show <warp-conversation-id> --agent warp
           asv export --all --agent codex --out ./out
           asv delete <session-id> --yes
           asv delete <session-id> --agent claude-code --yes
+          asv delete <session-id> --agent warp --yes
 
         GETTING HELP FOR ONE COMMAND
           asv list --help
@@ -69,7 +72,7 @@ struct HomeOptions: ParsableArguments {
         name: .long,
         help: ArgumentHelp(
             "Agent to browse.",
-            discussion: "grok-build (default), claude-code, or codex."
+            discussion: "grok-build (default), claude-code, codex, or warp."
         )
     )
     var agent: String = AgentKind.grokBuild.rawValue
@@ -78,14 +81,14 @@ struct HomeOptions: ParsableArguments {
         name: .long,
         help: ArgumentHelp(
             "Data root directory override.",
-            discussion: "Grok: $GROK_HOME|~/.grok. Claude: $CLAUDE_CONFIG_DIR|$CLAUDE_HOME|~/.claude. Codex: $CODEX_HOME|~/.codex."
+            discussion: "Grok: $GROK_HOME|~/.grok. Claude: $CLAUDE_CONFIG_DIR|$CLAUDE_HOME|~/.claude. Codex: $CODEX_HOME|~/.codex. Warp: $WARP_HOME|$WARP_DIR|macOS Warp-Stable group container."
         )
     )
     var home: String?
 
     func resolvedAgent() throws -> AgentKind {
         guard let kind = AgentKind(rawValue: agent) else {
-            throw ValidationError("Unknown agent '\(agent)'. Use: grok-build, claude-code, codex")
+            throw ValidationError("Unknown agent '\(agent)'. Use: grok-build, claude-code, codex, warp")
         }
         return kind
     }
@@ -424,7 +427,8 @@ struct DeleteCommand: ParsableCommand {
         abstract: "Permanently delete one session from the local data root.",
         discussion: """
         Looks up a session by id and removes its on-disk artifacts (Grok: session
-        directory; Claude/Codex: session jsonl file). This cannot be undone.
+        directory; Claude/Codex: session jsonl file; Warp: conversation rows in
+        warp.sqlite). This cannot be undone.
 
         Without --yes, prints session details and requires typing "delete" to confirm.
         Non-interactive use must pass --yes.
@@ -436,7 +440,7 @@ struct DeleteCommand: ParsableCommand {
           <session-id>    Required. Session id (directory name / UUID)
 
         OPTIONS
-          --agent <name>  grok-build (default) | claude-code | codex
+          --agent <name>  grok-build (default) | claude-code | codex | warp
           --home <path>   Data root override
           --yes           Skip interactive confirmation (required for scripts / no TTY)
 
@@ -444,6 +448,7 @@ struct DeleteCommand: ParsableCommand {
           asv delete 019f623a-a8d1-7591-beff-c41fc716b171 --yes
           asv delete <id> --agent claude-code --yes
           asv delete <id> --agent codex --home ~/.codex --yes
+          asv delete <id> --agent warp --yes
         """
     )
 

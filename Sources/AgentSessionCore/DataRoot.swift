@@ -31,7 +31,30 @@ public enum DataRoot {
                 return URL(fileURLWithPath: (home as NSString).expandingTildeInPath, isDirectory: true)
             }
             return fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".codex", isDirectory: true)
+        case .warp:
+            if let home = environment["WARP_HOME"], !home.isEmpty {
+                return warpRootURL(from: home)
+            }
+            if let home = environment["WARP_DIR"], !home.isEmpty {
+                return warpRootURL(from: home)
+            }
+            return defaultWarpDataRoot(fileManager: fileManager)
         }
+    }
+
+    /// Warp Stable app-support directory (contains `warp.sqlite`).
+    public static func defaultWarpDataRoot(fileManager: FileManager = .default) -> URL {
+        fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Group Containers/2BBY89MBSN.dev.warp/Library/Application Support/dev.warp.Warp-Stable", isDirectory: true)
+    }
+
+    /// Accept a directory or a path to `warp.sqlite`.
+    public static func warpRootURL(from raw: String) -> URL {
+        let expanded = (raw as NSString).expandingTildeInPath
+        if expanded.hasSuffix(".sqlite") {
+            return URL(fileURLWithPath: expanded).deletingLastPathComponent()
+        }
+        return URL(fileURLWithPath: expanded, isDirectory: true)
     }
 
     /// Backward-compatible Grok-only resolve.

@@ -22,6 +22,8 @@ public enum AgentStoreFactory {
             return ClaudeCatalog(homeOverride: homeOverride)
         case .codex:
             return CodexCatalog(homeOverride: homeOverride)
+        case .warp:
+            return WarpCatalog(homeOverride: homeOverride)
         }
     }
 }

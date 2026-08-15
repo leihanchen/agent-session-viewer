@@ -23,11 +23,11 @@ struct ContentView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(maxWidth: 360)
+                .frame(maxWidth: 460)
                 .onChange(of: model.selectedAgent) { _, _ in
                     model.switchAgent()
                 }
-                .help("Select which coding agent’s sessions to browse (Grok Build, Claude Code, Codex)")
+                .help("Select which coding agent’s sessions to browse (Grok Build, Claude Code, Codex, Warp)")
             }
             ToolbarItem(placement: .automatic) {
                 Text("\(model.selectedAgent.displayName) · \(model.dataRootPath)")

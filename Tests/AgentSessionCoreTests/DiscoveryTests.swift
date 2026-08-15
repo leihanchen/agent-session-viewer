@@ -161,6 +161,19 @@ final class DeleteSessionTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: outside.path))
     }
 
+    func testDeleteWarpConversationKeepsDatabase() throws {
+        let home = try copyFixture(named: "warp-home")
+        defer { try? FileManager.default.removeItem(at: home) }
+
+        let catalog = WarpCatalog(dataRoot: home)
+        let id = "sess-warp-1111-1111-1111-111111111111"
+        XCTAssertEqual(try catalog.listSessions().count, 2)
+        _ = try catalog.deleteSession(id: id)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: home.appendingPathComponent("warp.sqlite").path))
+        XCTAssertEqual(try catalog.listSessions().count, 1)
+        XCTAssertThrowsError(try catalog.session(id: id))
+    }
+
     func testIsStrictlyUnder() {
         let parent = URL(fileURLWithPath: "/tmp/root")
         let child = URL(fileURLWithPath: "/tmp/root/a/b")

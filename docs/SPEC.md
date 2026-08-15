@@ -9,7 +9,7 @@
 
 ## 1. Summary
 
-**Agent Session Viewer** is a local macOS app that visualizes coding-agent sessions on disk in a three-column UI (Projects → Sessions → Details), with a companion CLI **`asv`** for list/export/delete. Browse and export do not mutate agent data roots; delete permanently removes one session after confirmation (ADR 0008).
+**Agent Session Viewer** is a local macOS app that visualizes coding-agent sessions on disk in a three-column UI (Projects → Sessions → Details), with a companion CLI **`asv`** for list/export/delete. Browse and export do not mutate agent data roots; delete permanently removes selected session(s) after confirmation (ADR 0008). Warp sessions live in `warp.sqlite` (ADR 0009).
 
 - **Agents:** Grok Build (`~/.grok`), Claude Code (`~/.claude`), and Codex (`~/.codex`), selected via toolbar / CLI `--agent`.
 - **Future:** more Agents behind the same UI and Export bundle schema.

@@ -1,6 +1,6 @@
 # Agent Session Viewer
 
-A local macOS application (with companion CLI) for browsing, exporting, and optionally deleting coding-agent sessions stored on disk. English UI only. Supports Grok Build, Claude Code, and Codex via an agent picker. Browse/export are non-mutating; delete permanently removes one selected session after confirmation.
+A local macOS application (with companion CLI) for browsing, exporting, and optionally deleting coding-agent sessions stored on disk. English UI only. Supports Grok Build, Claude Code, Codex, and Warp via an agent picker. Browse/export are non-mutating; delete permanently removes selected session(s) after confirmation.
 
 ## Language
 
@@ -13,11 +13,11 @@ The companion command-line binary for listing, exporting, and deleting sessions 
 _Avoid_: gsv
 
 **Session delete**:
-Permanently remove one Session’s primary on-disk artifact (Grok directory; Claude/Codex jsonl) from the local Agent data root after UI confirmation or `asv delete --yes` / interactive confirm. Irreversible; not bulk delete.
+Permanently remove Session artifacts from the local Agent data root after UI confirmation or `asv delete --yes` / interactive confirm (Grok directory; Claude/Codex jsonl; Warp conversation rows in `warp.sqlite`). Irreversible. Viewer may delete several selected Sessions at once.
 _Avoid_: soft delete, trash, wipe project
 
 **Agent**:
-A coding-agent product whose on-disk sessions Agent Session Viewer can read. Supported: Grok Build, Claude Code, Codex. Domain model stays agent-agnostic where practical.
+A coding-agent product whose on-disk sessions Agent Session Viewer can read. Supported: Grok Build, Claude Code, Codex, Warp. Domain model stays agent-agnostic where practical.
 _Avoid_: model (use for LLM id), provider (too vague)
 
 **Agent picker**:
@@ -35,11 +35,15 @@ _Avoid_: Claude.ai web history, Anthropic cloud
 The root directory of OpenAI Codex’s on-disk state. Defaults to `~/.codex`, or `$CODEX_HOME` when set.
 _Avoid_: ChatGPT web history
 
+**Warp home**:
+The directory that contains Warp’s `warp.sqlite`. Defaults to the macOS group container `…/dev.warp.Warp-Stable/`, or `$WARP_HOME` / `$WARP_DIR` when set.
+_Avoid_: Warp cloud conversations, Warp Drive
+
 **Data root**:
-The configured on-disk root for the selected Agent (Grok, Claude, or Codex home).
+The configured on-disk root for the selected Agent (Grok, Claude, Codex, or Warp home).
 
 **Project**:
-A working-directory group under a Data root that owns zero or more Sessions (Grok: encoded cwd under `sessions/`; Claude: folder under `projects/`; Codex: grouped by session `cwd`).
+A working-directory group under a Data root that owns zero or more Sessions (Grok: encoded cwd under `sessions/`; Claude: folder under `projects/`; Codex/Warp: grouped by session `cwd`).
 _Avoid_: repository (unless referring to git metadata on a session), workspace (ambiguous with editor workspaces)
 
 **Session**:
