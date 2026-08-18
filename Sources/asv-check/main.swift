@@ -39,6 +39,17 @@ struct ASVCheck {
             DataRoot.resolve(override: nil, environment: ["GROK_HOME": "/tmp/from-env"]).path == "/tmp/from-env",
             "data root GROK_HOME"
         )
+        #if os(macOS)
+        expect(
+            DataRoot.defaultWarpDataRoot().path.contains("dev.warp.Warp-Stable"),
+            "warp default is macOS Warp-Stable"
+        )
+        #else
+        expect(
+            DataRoot.defaultWarpDataRoot().path.contains(".local/state/warp-terminal"),
+            "warp default is Linux warp-terminal"
+        )
+        #endif
 
         // Fixture catalog
         let fixtureHome = fixtureGrokHome()

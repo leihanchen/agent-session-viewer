@@ -36,7 +36,7 @@ The root directory of OpenAI Codex’s on-disk state. Defaults to `~/.codex`, or
 _Avoid_: ChatGPT web history
 
 **Warp home**:
-The directory that contains Warp’s `warp.sqlite`. Defaults to the macOS group container `…/dev.warp.Warp-Stable/`, or `$WARP_HOME` / `$WARP_DIR` when set.
+The directory that contains Warp’s `warp.sqlite`. Defaults to the macOS group container `…/dev.warp.Warp-Stable/`, or `~/.local/state/warp-terminal` on Linux, or `$WARP_HOME` / `$WARP_DIR` when set.
 _Avoid_: Warp cloud conversations, Warp Drive
 
 **Data root**:

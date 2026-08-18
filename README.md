@@ -21,7 +21,7 @@ See [docs/SPEC.md](docs/SPEC.md) (requirements), [AGENTS.md](AGENTS.md) (coding-
 | **Grok Build** | `grok-build` | `~/.grok` | `$GROK_HOME` |
 | **Claude Code** | `claude-code` | `~/.claude` | `$CLAUDE_CONFIG_DIR` or `$CLAUDE_HOME` |
 | **Codex** | `codex` | `~/.codex` | `$CODEX_HOME` |
-| **Warp** | `warp` | `~/Library/Group Containers/2BBY89MBSN.dev.warp/Library/Application Support/dev.warp.Warp-Stable` | `$WARP_HOME` or `$WARP_DIR` |
+| **Warp** | `warp` | macOS: `~/Library/Group Containers/2BBY89MBSN.dev.warp/…/dev.warp.Warp-Stable`<br>Linux: `~/.local/state/warp-terminal` | `$WARP_HOME` or `$WARP_DIR` |
 
 - **App:** segmented control in the toolbar selects the active agent; projects, sessions, conversation, and search apply to **that agent only**.
 - **CLI:** pass `--agent grok-build` (default), `claude-code`, `codex`, or `warp`. Optional `--home <path>` overrides that agent’s data root.
@@ -29,25 +29,48 @@ See [docs/SPEC.md](docs/SPEC.md) (requirements), [AGENTS.md](AGENTS.md) (coding-
 
 ## Requirements
 
-- macOS 14+
-- Swift 5.9+ / Xcode 15+
-- Apple Silicon for the published installer build
+- **CLI (`asv`):** macOS 14+ or Linux; Swift 5.9+; Linux needs `libsqlite3-dev`
+- **App:** macOS 14+ / Xcode 15+
+- Apple Silicon for the published **PKG** installer
 
 ## Build
 
 ```bash
 cd agent-session-viewer
-swift build
-swift run asv-check          # fixture smoke tests (Grok + Claude; works with CLT-only)
-# swift test                 # requires full Xcode (XCTest)
+swift build --product asv
+swift run asv-check          # fixture smoke tests (works with CLT-only / Linux)
+# swift test                 # XCTest; full Xcode on macOS
 ```
 
 Install the CLI locally:
 
 ```bash
 swift build -c release --product asv
-cp .build/release/asv /usr/local/bin/asv   # or any directory on your PATH
+cp .build/release/asv /usr/local/bin/asv   # or ~/.local/bin
 asv --help
+```
+
+### Linux
+
+The **viewer app is macOS-only**. On Linux, `Package.swift` does not include `AgentSessionViewer`.
+
+**Prebuilt CLI** (from a tagged [Release](https://github.com/leihanchen/agent-session-viewer/releases)): `asv-<version>-linux-x86_64.tar.gz`. Needs `libsqlite3` on the machine (no Swift toolchain).
+
+```bash
+tar -xzf asv-*-linux-x86_64.tar.gz
+install -m 755 asv ~/.local/bin/asv   # or sudo install -m 755 asv /usr/local/bin/asv
+asv --help
+```
+
+**Build from source:**
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install -y libsqlite3-dev
+# Install Swift 5.9+ from swift.org or swiftly, then:
+swift build -c release --product asv
+swift run asv-check
+cp .build/release/asv ~/.local/bin/asv
 ```
 
 ## CLI
@@ -102,7 +125,7 @@ asv show <session-id> --json
 
 In the **viewer**, select one or more sessions in the Sessions list (**click**, **⌘-click** to toggle, **Shift-click** for a range), then use the trash toolbar button or context menu to delete them together after confirmation.
 
-Export JSON includes `"agent": "grok-build"`, `"claude-code"`, or `"codex"`.
+Export JSON includes `"agent": "grok-build"`, `"claude-code"`, `"codex"`, or `"warp"`.
 
 ## macOS app (dev)
 
@@ -142,7 +165,7 @@ AGENTS.md
 
 ## Install notes (product)
 
-- **Installer (only distribution format):** double-click the `.pkg`. It installs:
+- **macOS installer:** double-click the `.pkg`. It installs:
   - **Agent Session Viewer.app** → `/Applications`
   - **`asv`** → `/usr/local/bin/asv`  
   Admin password once; no drag-and-drop, no separate CLI copy, **no DMG**.
@@ -163,8 +186,9 @@ Outputs:
 | Installer package | `dist/AgentSessionViewer-<version>.pkg` |
 | Stable pkg name | `dist/AgentSessionViewer.pkg` |
 | Staged app | `dist/stage-build/Agent Session Viewer.app` |
+| Linux CLI (CI) | `asv-<version>-linux-x86_64.tar.gz` on the workflow run / Release |
 
-**User flow:** download **AgentSessionViewer-0.2.0.pkg** (or latest) from [Releases](https://github.com/leihanchen/agent-session-viewer/releases) → double-click → authenticate → open the app from Applications and run `asv --help` in Terminal.
+**User flow:** download **AgentSessionViewer-0.2.0.pkg** (or latest) from [Releases](https://github.com/leihanchen/agent-session-viewer/releases) → double-click → authenticate → open the app from Applications and run `asv --help` in Terminal. Linux users download **`asv-*-linux-x86_64.tar.gz`** from the same Release.
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
@@ -179,7 +203,7 @@ sudo rm -rf /path/to/repo/dist/stage   # only if a root-owned leftover exists th
 
 ### GitHub Actions (remote rebuild)
 
-Workflow: [`.github/workflows/build-installer.yml`](.github/workflows/build-installer.yml) (macOS runner).
+Workflow: [`.github/workflows/build-installer.yml`](.github/workflows/build-installer.yml) — **macOS PKG** job + **Linux asv** job.
 
 | Trigger | How |
 |---------|-----|
@@ -189,7 +213,7 @@ Workflow: [`.github/workflows/build-installer.yml`](.github/workflows/build-inst
 | **Tag** | `git tag v0.2.0 && git push origin v0.2.0` (uploads release assets) |
 | **Push to `main`** | When `Sources/`, `scripts/`, or packaging paths change |
 
-Artifacts (`.pkg` only) appear under the workflow run → **Artifacts**, and on tag Releases.
+Artifacts (`.pkg` and Linux `asv-*-linux-*.tar.gz`) appear under the workflow run → **Artifacts**, and on tag Releases.
 
 ```bash
 # Trigger from anywhere with gh authenticated

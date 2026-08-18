@@ -1,6 +1,10 @@
 import ArgumentParser
 import AgentSessionCore
+#if canImport(Darwin)
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 import Foundation
 
 @main
@@ -25,7 +29,7 @@ struct ASV: ParsableCommand {
           --agent <name>        grok-build (default) | claude-code | codex | warp
           --home <path>         Agent data root override
                                 (Grok: ~/.grok; Claude: ~/.claude; Codex: ~/.codex;
-                                 Warp: group-container Warp-Stable / warp.sqlite)
+                                 Warp: macOS group container or Linux ~/.local/state/warp-terminal)
           --json                Machine-readable JSON on stdout (list/projects/sessions/show)
           -h, --help            Show help for asv or a subcommand
           --version             Print version
@@ -81,7 +85,7 @@ struct HomeOptions: ParsableArguments {
         name: .long,
         help: ArgumentHelp(
             "Data root directory override.",
-            discussion: "Grok: $GROK_HOME|~/.grok. Claude: $CLAUDE_CONFIG_DIR|$CLAUDE_HOME|~/.claude. Codex: $CODEX_HOME|~/.codex. Warp: $WARP_HOME|$WARP_DIR|macOS Warp-Stable group container."
+            discussion: "Grok: $GROK_HOME|~/.grok. Claude: $CLAUDE_CONFIG_DIR|$CLAUDE_HOME|~/.claude. Codex: $CODEX_HOME|~/.codex. Warp: $WARP_HOME|$WARP_DIR, else macOS Warp-Stable group container or Linux ~/.local/state/warp-terminal."
         )
     )
     var home: String?

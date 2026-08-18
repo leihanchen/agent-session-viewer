@@ -42,10 +42,17 @@ public enum DataRoot {
         }
     }
 
-    /// Warp Stable app-support directory (contains `warp.sqlite`).
+    /// Directory that contains `warp.sqlite` (macOS group container; Linux XDG state).
     public static func defaultWarpDataRoot(fileManager: FileManager = .default) -> URL {
-        fileManager.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Group Containers/2BBY89MBSN.dev.warp/Library/Application Support/dev.warp.Warp-Stable", isDirectory: true)
+        let home = fileManager.homeDirectoryForCurrentUser
+        #if os(macOS)
+        return home.appendingPathComponent(
+            "Library/Group Containers/2BBY89MBSN.dev.warp/Library/Application Support/dev.warp.Warp-Stable",
+            isDirectory: true
+        )
+        #else
+        return home.appendingPathComponent(".local/state/warp-terminal", isDirectory: true)
+        #endif
     }
 
     /// Accept a directory or a path to `warp.sqlite`.

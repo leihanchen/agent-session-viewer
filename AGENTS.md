@@ -15,7 +15,8 @@ Instructions for AI coding agents working in **this repository**. Keep changes a
 | Shared library | `AgentSessionCore` |
 
 - **English UI only**
-- **Agent stores:** Grok Build (`~/.grok`), Claude Code (`~/.claude`), Codex (`~/.codex`), Warp (`warp.sqlite` in the Warp-Stable group container); toolbar picker + CLI `--agent`
+- **Agent stores:** Grok Build (`~/.grok`), Claude Code (`~/.claude`), Codex (`~/.codex`), Warp (`warp.sqlite`: macOS group container or Linux `~/.local/state/warp-terminal`); toolbar picker + CLI `--agent`
+- **CLI (`asv`)** builds on **macOS and Linux**. **Viewer** is **macOS-only** (not in the Linux product list).
 - **Future agents:** add `AgentSessionStore` under `Sources/AgentSessionCore/<Agent>/`
 - **Not:** a website, WebView app, cloud service, or session editor
 
@@ -175,7 +176,7 @@ Three columns (CC LOG–style, English):
 <data-root>/warp.sqlite
 ```
 
-- Default: `$WARP_HOME` / `$WARP_DIR` or macOS `…/Group Containers/2BBY89MBSN.dev.warp/…/dev.warp.Warp-Stable/`
+- Default: `$WARP_HOME` / `$WARP_DIR`, else macOS group container or Linux `~/.local/state/warp-terminal`
 - Discover `agent_conversations`; user turns from `ai_queries` (`Query.text`)
 - Group projects by `summary.initial_working_directory`
 - Adapter: `WarpCatalog` / `WarpTranscript`
