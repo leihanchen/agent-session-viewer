@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 
 /// Grok Build `updates.jsonl` parser (internal to Core; use `SessionTranscript` from app/CLI).
 enum GrokUpdates {

@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 
 /// Parse Claude Code `projects/<cwd>/<sessionId>.jsonl` into normalized events + metadata.
 enum ClaudeTranscript {

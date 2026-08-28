@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 
 /// Parse Codex `sessions/**/rollout-*.jsonl` into normalized events + session meta.
 enum CodexTranscript {
