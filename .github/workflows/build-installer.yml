@@ -1,4 +1,4 @@
-# Build Agent Session Viewer installers for macOS (PKG) and Linux (tarball).
+# Build Agent Session Viewer installers for macOS (PKG) and Debian-family Linux (DEB).
 #
 # Triggers:
 #   - workflow_dispatch  — manual / remote via `gh workflow run` or Actions UI
@@ -8,7 +8,7 @@
 #
 # Tag releases attach:
 #   - AgentSessionViewer-<version>.pkg  (macOS app + asv)
-#   - asv-<version>-linux-<arch>.tar.gz (terminal viewer + CLI)
+#   - agent-session-viewer-<version>-linux-<arch>.deb (terminal viewer + CLI)
 #
 name: Build installer
 
@@ -62,7 +62,7 @@ permissions:
 
 jobs:
   linux-cli:
-    name: Linux asv
+    name: Linux Debian installer
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -91,7 +91,13 @@ jobs:
           ARCH="$(uname -m)"
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "arch=$ARCH" >> "$GITHUB_OUTPUT"
-          echo "asset=asv-${V}-linux-${ARCH}.tar.gz" >> "$GITHUB_OUTPUT"
+          case "$ARCH" in
+            x86_64) DEB_ARCH=amd64 ;;
+            aarch64|arm64) DEB_ARCH=arm64 ;;
+            *) echo "Unsupported Linux architecture: $ARCH" >&2; exit 1 ;;
+          esac
+          echo "deb_arch=$DEB_ARCH" >> "$GITHUB_OUTPUT"
+          echo "asset=agent-session-viewer-${V}-linux-${DEB_ARCH}.deb" >> "$GITHUB_OUTPUT"
           echo "Using ASV_VERSION=$V arch=$ARCH"
 
       - name: Install Swift
@@ -123,33 +129,43 @@ jobs:
           echo "$GOT" | grep -q "$WANT"
           file .build/release/asv
 
-      - name: Package tarball
+      - name: Package Debian installer
         run: |
           set -euo pipefail
-          mkdir -p dist/asv-linux
-          cp .build/release/asv dist/asv-linux/asv
-          cp .build/release/AgentSessionViewer dist/asv-linux/AgentSessionViewer
-          chmod 755 dist/asv-linux/asv dist/asv-linux/AgentSessionViewer
-          cat > dist/asv-linux/README.txt <<'EOF'
+          PKG_ROOT="dist/deb-root"
+          mkdir -p "$PKG_ROOT/DEBIAN" "$PKG_ROOT/usr/bin" "$PKG_ROOT/usr/share/doc/agent-session-viewer"
+          cp .build/release/asv "$PKG_ROOT/usr/bin/asv"
+          cp .build/release/AgentSessionViewer "$PKG_ROOT/usr/bin/AgentSessionViewer"
+          chmod 755 "$PKG_ROOT/usr/bin/asv" "$PKG_ROOT/usr/bin/AgentSessionViewer"
+          cat > "$PKG_ROOT/DEBIAN/control" <<EOF
+          Package: agent-session-viewer
+          Version: ${{ steps.ver.outputs.version }}
+          Section: devel
+          Priority: optional
+          Architecture: ${{ steps.ver.outputs.deb_arch }}
+          Maintainer: Agent Session Viewer maintainers
+          Depends: libc6, libsqlite3-0
+          Description: Local coding-agent session viewer and CLI
+           Includes the AgentSessionViewer terminal UI and the asv command-line tool.
+          EOF
+          cat > "$PKG_ROOT/usr/share/doc/agent-session-viewer/README" <<'EOF'
           Agent Session Viewer for Linux
 
-            ./AgentSessionViewer --help   terminal session browser
-            ./asv --help                  scriptable CLI
-
-          The binaries are self-contained except for the system SQLite runtime.
+          Run AgentSessionViewer for the terminal UI or asv for the scriptable CLI.
           EOF
-          tar -C dist/asv-linux -czf "dist/${{ steps.ver.outputs.asset }}" asv AgentSessionViewer README.txt
+          dpkg-deb --build --root-owner-group "$PKG_ROOT" "dist/${{ steps.ver.outputs.asset }}"
+          dpkg-deb --info "dist/${{ steps.ver.outputs.asset }}"
           ls -lh "dist/${{ steps.ver.outputs.asset }}"
 
-      - name: Upload Linux installer bundle
+      - name: Upload Linux Debian installer
         uses: actions/upload-artifact@v4
         with:
-          name: asv-${{ steps.ver.outputs.version }}-linux-${{ steps.ver.outputs.arch }}
+          name: agent-session-viewer-${{ steps.ver.outputs.version }}-linux-${{ steps.ver.outputs.deb_arch }}
           path: dist/${{ steps.ver.outputs.asset }}
           if-no-files-found: error
           retention-days: 30
 
-      - name: Attach Linux CLI to GitHub Release (tags only)
+      - name: Attach Linux installer to GitHub Release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:

@@ -54,11 +54,10 @@ asv --help
 
 Linux uses a dependency-free terminal viewer with the same normalized Core model and store adapters. The richer SwiftUI desktop app remains macOS-only because SwiftUI/AppKit are not available on Linux.
 
-**Prebuilt bundle** (from a tagged [Release](https://github.com/leihanchen/agent-session-viewer/releases)): `asv-<version>-linux-x86_64.tar.gz`. It contains both `asv` and the `AgentSessionViewer` terminal UI; it needs `libsqlite3` on the machine (no Swift toolchain).
+**Prebuilt Debian installer** (from a tagged [Release](https://github.com/leihanchen/agent-session-viewer/releases)): `agent-session-viewer-<version>-linux-amd64.deb`. It installs both `asv` and the `AgentSessionViewer` terminal UI; `libsqlite3-0` is installed as a package dependency.
 
 ```bash
-tar -xzf asv-*-linux-x86_64.tar.gz
-install -m 755 asv AgentSessionViewer ~/.local/bin/   # or use /usr/local/bin
+sudo apt install ./agent-session-viewer-*-linux-amd64.deb
 asv --help
 AgentSessionViewer --help
 ```
@@ -187,9 +186,9 @@ Outputs:
 | Installer package | `dist/AgentSessionViewer-<version>.pkg` |
 | Stable pkg name | `dist/AgentSessionViewer.pkg` |
 | Staged app | `dist/stage-build/Agent Session Viewer.app` |
-| Linux CLI (CI) | `asv-<version>-linux-x86_64.tar.gz` on the workflow run / Release |
+| Linux installer (CI) | `agent-session-viewer-<version>-linux-amd64.deb` on the workflow run / Release |
 
-**User flow:** download **AgentSessionViewer-0.2.0.pkg** (or latest) from [Releases](https://github.com/leihanchen/agent-session-viewer/releases) → double-click → authenticate → open the app from Applications and run `asv --help` in Terminal. Linux users download **`asv-*-linux-x86_64.tar.gz`** from the same Release.
+**User flow:** download **AgentSessionViewer-0.2.0.pkg** (or latest) from [Releases](https://github.com/leihanchen/agent-session-viewer/releases) → double-click → authenticate → open the app from Applications and run `asv --help` in Terminal. Debian-family Linux users download **`agent-session-viewer-*-linux-amd64.deb`** and install it with `apt`.
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
@@ -214,7 +213,7 @@ Workflow: [`.github/workflows/build-installer.yml`](.github/workflows/build-inst
 | **Tag** | `git tag v0.2.0 && git push origin v0.2.0` (uploads release assets) |
 | **Push to `main`** | When `Sources/`, `scripts/`, or packaging paths change |
 
-Artifacts (`.pkg` and Linux `asv-*-linux-*.tar.gz`) appear under the workflow run → **Artifacts**, and on tag Releases.
+Artifacts (`.pkg` and Linux `agent-session-viewer-*-linux-*.deb`) appear under the workflow run → **Artifacts**, and on tag Releases.
 
 ```bash
 # Trigger from anywhere with gh authenticated

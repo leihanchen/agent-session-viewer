@@ -134,7 +134,7 @@ ASV_VERSION=0.2.0 ./scripts/package-dmg.sh
 
 Version resolution: `ASV_VERSION` → `v*` tag → `VERSION`; `embed-version.sh` updates `Version.swift`. The historically named `package-dmg.sh` must produce **PKG only**: app → `/Applications`, CLI → `/usr/local/bin`, fallback CLI inside the app. Packaging requires `Assets/asv-icon-1024.png`.
 
-CI (`.github/workflows/build-installer.yml`) builds the macOS PKG and Linux tarball (both `asv` and `AgentSessionViewer`) on Ubuntu; tags attach both to Releases.
+CI (`.github/workflows/build-installer.yml`) builds the macOS PKG and Linux Debian installer (both `asv` and `AgentSessionViewer`) on Ubuntu; tags attach both to Releases.
 
 ## Change checklist
 
