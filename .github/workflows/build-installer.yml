@@ -34,6 +34,7 @@ on:
       - "v*"
     branches:
       - main
+      - "codex/**"
     paths:
       - "Sources/**"
       - "Package.swift"
