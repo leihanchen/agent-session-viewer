@@ -1,232 +1,149 @@
-# AGENTS.md — coding agent memory
+# AGENTS.md — coding-agent runbook
 
-Instructions for AI coding agents working in **this repository**. Keep changes aligned with the product decisions below; prefer reading `docs/SPEC.md` for full requirements and `CONTEXT.md` for domain vocabulary.
+Instructions for AI agents working in this repository. Read `docs/adr/` before changing locked decisions, `docs/SPEC.md` for requirements, and `CONTEXT.md` for domain terms.
 
----
+## Product
 
-## What this project is
+**Agent Session Viewer** is a local SwiftUI macOS app with a companion Swift CLI, **`asv`**, for browsing, searching, exporting, and confirmed deletion of coding-agent Sessions.
 
-**Agent Session Viewer** — local macOS app + companion CLI **`asv`** for browsing, exporting, and (when confirmed) deleting coding-agent sessions on disk.
+| Target | Purpose | Platforms |
+|--------|---------|-----------|
+| `AgentSessionCore` | Shared models, stores, parsing, search, export, delete safety | macOS, Linux |
+| `asv` | CLI (ArgumentParser) | macOS, Linux |
+| `asv-check` | Fixture smoke checks | macOS, Linux |
+| `AgentSessionViewer` | SwiftUI app | macOS 14+ |
 
-| Surface | Name |
-|---------|------|
-| macOS app | Agent Session Viewer |
-| CLI binary | `asv` |
-| Shared library | `AgentSessionCore` |
+Supported Agents: **Grok Build, Claude Code, Codex, Warp**. English UI only. Browse/search/export require no network. This is not a website, cloud service, or Session editor.
 
-- **English UI only**
-- **Agent stores:** Grok Build (`~/.grok`), Claude Code (`~/.claude`), Codex (`~/.codex`), Warp (`warp.sqlite`: macOS group container or Linux `~/.local/state/warp-terminal`); toolbar picker + CLI `--agent`
-- **CLI (`asv`)** builds on **macOS and Linux**. **Viewer** is **macOS-only** (not in the Linux product list).
-- **Future agents:** add `AgentSessionStore` under `Sources/AgentSessionCore/<Agent>/`
-- **Not:** a website, WebView app, cloud service, or session editor
+## Hard rules
 
----
+1. Agent Data roots are non-mutating by default: never rename, rewrite, or repair their contents.
+2. Confirmed Session delete is the only mutation exception (ADR 0008/0009):
+   - Grok: one Session directory.
+   - Claude/Codex: one Session JSONL file.
+   - Warp: rows for one `conversation_id` in a transaction; never delete `warp.sqlite`.
+   - File-backed deletion must use `SessionDeleter` containment/type checks.
+3. Export writes only to the chosen output directory. Treat exports as sensitive.
+4. Keep the native, non-sandboxed Swift architecture (ADRs 0001/0004); no Electron, Tauri, WebView, or App Sandbox in v1.
+5. Keep Core Agent-agnostic (`AgentKind`, `Project`, `SessionInfo`, `SessionEvent`, `ExportBundle`). Agent-specific parsing belongs under `Sources/AgentSessionCore/<Agent>/` behind `AgentSessionStore`.
+6. Use `CONTEXT.md` terms: **Agent, Data root, Project, Session, Detail stream, Event, Readable mode, Full trace, Export bundle**. Avoid workspace/chat/thread for these concepts.
+7. New Agents require `AgentKind`, `DataRoot`, store/factory, transcript dispatch, fixtures/checks, CLI help, and docs updates.
 
-## Hard rules (do not violate)
+## Architecture and layout
 
-1. **Non-mutating by default toward agent data roots** — do not rename, rewrite, or “fix” files under any Data root. **Exception (ADR 0008 / 0009):** confirmed session delete via `AgentSessionStore.deleteSession` / UI Delete / `asv delete` only. Warp delete is SQL row delete inside `warp.sqlite` — never remove the database file. Export **writes** only under a user-chosen output path.
-2. **No network required** for browse/export.
-3. **SwiftUI + Swift** for app and CLI — not Tauri, Electron, or a web UI stack (ADR 0001).
-4. **Non-sandboxed** local app for v1 (must read outside the app container).
-5. Prefer **agent-agnostic** types in Core (`Project`, `Session`, `Event`, `ExportBundle`); put layout parsing under `Sources/AgentSessionCore/Grok/` or `Claude/` via `AgentSessionStore`.
-6. Use glossary terms from `CONTEXT.md` in code comments, UI strings, and docs (e.g. **Project**, **Session**, **Detail stream**, not “workspace/chat/thread” for those concepts).
-
----
-
-## Repo map
-
-```
-Package.swift                 # SPM: AgentSessionCore, asv, AgentSessionViewer, asv-check
-Sources/AgentSessionCore/     # discovery, models, Grok adapter, export
-Sources/asv/                  # CLI (ArgumentParser) — keep --help complete
-Sources/AgentSessionViewer/     # SwiftUI three-column app
-Sources/asv-check/            # fixture smoke tests (no XCTest / CLT-friendly)
-Tests/AgentSessionCoreTests/  # XCTest + Fixtures (needs full Xcode)
-docs/SPEC.md                  # product requirements & phases
-docs/adr/                     # architecture decisions
-CONTEXT.md                    # domain glossary only (not agent runbook)
-README.md                     # human quickstart
+```text
+AgentSessionViewer (SwiftUI)       asv (ArgumentParser)
+              \                    /
+               AgentSessionCore
+ models · roots · transcripts · search · export · delete safety
+                       |
+              AgentSessionStore
+       Grok | Claude | Codex | Warp adapters
+       files   JSONL    JSONL   SQLite rows
 ```
 
----
+- Swift tools 5.9; macOS deployment target 14.
+- `swift-argument-parser` is CLI-only. Core links `sqlite3` for Warp; Linux builds need `libsqlite3-dev`.
+- `Package.swift` declares the viewer only on macOS. Never import SwiftUI/AppKit in Core or CLI.
+- Flow: `DataRoot.resolve` → `AgentStoreFactory` → normalized models/events → `SessionTranscript`, `ConversationSearch`, `SessionExporter`, or `deleteSession`.
+- Readable mode coalesces text chunks and removes noise; Full trace preserves all normalized Events. Export always uses Full trace, schema version 1.
+- Search is case-insensitive per selected Agent, ranked by matching Event count then recency.
 
-## Build & verify (mandatory before claiming done)
+```text
+Sources/AgentSessionCore/
+  Agent/                 # protocol, factory, delete safety
+  Grok/ Claude/ Codex/ Warp/
+  Search/ Export/
+  DataRoot.swift Models.swift SessionTitle.swift SessionTranscript.swift
+Sources/asv/ASV.swift
+Sources/AgentSessionViewer/
+Sources/asv-check/main.swift
+Tests/AgentSessionCoreTests/Fixtures/{grok-home,claude-home,codex-home,warp-home}/
+docs/{SPEC.md,adr/}  CONTEXT.md  README.md  CHANGELOG.md
+```
+
+## Agent stores
+
+| Agent / CLI id | Root resolution | Discovery |
+|----------------|-----------------|-----------|
+| Grok Build / `grok-build` | `--home` → `$GROK_HOME` → `~/.grok` | `sessions/<encoded-cwd>/<id>/{summary.json,updates.jsonl}` |
+| Claude Code / `claude-code` | `--home` → `$CLAUDE_CONFIG_DIR` → `$CLAUDE_HOME` → `~/.claude` | `projects/<encoded-cwd>/<id>.jsonl`; prefer JSONL `cwd` |
+| Codex / `codex` | `--home` → `$CODEX_HOME` → `~/.codex` | scan `sessions/YYYY/MM/DD/rollout-*.jsonl`; optional `session_index.jsonl` titles; group by `session_meta.cwd` |
+| Warp / `warp` | `--home` → `$WARP_HOME` → `$WARP_DIR` → platform default | `warp.sqlite`: `agent_conversations` + `ai_queries` |
+
+Warp defaults: macOS group container `…/dev.warp.Warp-Stable`; Linux `~/.local/state/warp-terminal`. An override may be a directory or the SQLite path. Warp `SessionInfo.directoryPath` is a locator, not a removable path. Do not decode `agent_tasks` protobuf in v1. Do not depend on third-party Claude/Codex indexes.
+
+## `asv` CLI contract
+
+One Agent per invocation; `grok-build` and `list` are defaults.
+
+| Command | Contract |
+|---------|----------|
+| `list` | Root plus Project/Session counts; `--json` object |
+| `projects` | Project groups; text TSV or `--json` array |
+| `sessions [project-id]` | All or exact-Project Sessions; text TSV or `--json` array |
+| `show <session-id>` | Metadata + Readable conversation; `--full` for Full trace; optional `--json` |
+| `export <id>\|--all` | One Full-trace JSON file per Session; `--out` defaults to `./asv-export` |
+| `delete <session-id>` | Exactly one Session; type `delete` interactively or pass `--yes` (required without TTY) |
+
+Common options: `--agent grok-build|claude-code|codex|warp`, `--home <path>`. `--json` is limited to list/projects/sessions/show; `--full` to show; `--out` to export; `--yes` to delete.
+
+Export is normalized JSON, not raw files or a zip. It contains top-level `schema_version`, `agent`, `exported_at`, `session`, and `events`; top-level custom keys are snake_case while nested synthesized model keys are camelCase. Files are pretty-printed, atomically written, and named from the Session id with `/` replaced by `_`.
+
+Missing roots/Sessions, invalid Agent or export arguments, unsafe deletes, and write failures must exit non-zero with clear errors. Keep top-level and subcommand `--help` accurate.
+
+## App contract
+
+- Three columns: **Projects → Sessions → Details/Conversation**.
+- Toolbar: persisted four-Agent picker, resolved root, Readable/Full trace, Refresh, confirmed Delete.
+- Sessions list shows all Sessions for the Agent, newest first; Project selection jumps to that Project’s first Session.
+- One debounced “Search all conversations…” field searches the selected Agent only, ranks/highlights matches, and returns to browse on an empty query.
+- Click/⌘-click/Shift-click multi-selection; app can confirm-delete selected Sessions, while CLI deletion remains one at a time.
+- Title fallback: Agent summary/title → first user message → short id.
+- Subagent Sessions are flat; loading is snapshot + Refresh; no live watcher.
+- CLI export is complete; in-app export controls remain pending.
+
+## Build and verify
+
+Mandatory before claiming done:
 
 ```bash
 swift build
-swift run asv-check                    # always — works with Command Line Tools only
+swift run asv-check
 swift build --product asv
-.build/debug/asv --help                # help must list all commands + usage
-.build/debug/asv list                  # optional live check against ~/.grok
-# swift test                           # only if full Xcode is installed (XCTest)
+.build/debug/asv --help
+.build/debug/asv list --help
+.build/debug/asv projects --help
+.build/debug/asv sessions --help
+.build/debug/asv show --help
+.build/debug/asv export --help
+.build/debug/asv delete --help
 ```
 
-App (dev):
+Run `swift test` when full Xcode/XCTest is available. For GUI work, run `swift run AgentSessionViewer`. Live-root checks are optional; never test delete against user data or immutable fixtures—use temporary fixture copies.
+
+Release checks:
 
 ```bash
-swift run AgentSessionViewer
-```
-
-Release CLI / installer:
-
-```bash
-# Embed marketing version (from ASV_VERSION, git tag, or VERSION file)
 ./scripts/embed-version.sh
 swift build -c release --product asv
-./.build/release/asv --version            # must match VERSION / tag
-ASV_VERSION=0.2.0 ./scripts/package-dmg.sh   # PKG only; Info.plist matches asv --version
+.build/release/asv --version
+ASV_VERSION=0.2.0 ./scripts/package-dmg.sh
 ```
 
-**Version source of truth:** `scripts/embed-version.sh` → `VERSION` + `Sources/AgentSessionCore/Version.swift` (`ASVVersion.current`). Used by CLI and CFBundleShortVersionString. See `CHANGELOG.md` for release history.
+Version resolution: `ASV_VERSION` → `v*` tag → `VERSION`; `embed-version.sh` updates `Version.swift`. The historically named `package-dmg.sh` must produce **PKG only**: app → `/Applications`, CLI → `/usr/local/bin`, fallback CLI inside the app. Packaging requires `Assets/asv-icon-1024.png`.
 
-### CI (GitHub Actions)
+CI (`.github/workflows/build-installer.yml`) builds the PKG on `macos-14` and the Linux CLI tarball on Ubuntu; tags attach both to Releases.
 
-- Workflow: `.github/workflows/build-installer.yml` on **macos-14**
-- Rebuilds installer remotely via:
-  - `workflow_dispatch` (`gh workflow run build-installer.yml -f version=0.2.0`)
-  - `repository_dispatch` event type `build-installer`
-  - tag `v*`
-  - push to `main` when packaging/source paths change
-- Uploads `.pkg` as workflow artifact; tags attach the `.pkg` to a GitHub Release
+## Change checklist
 
----
+1. Check ADRs; update `docs/SPEC.md` for requirement changes and `CONTEXT.md` only for glossary changes.
+2. Keep source, CLI help, README, SPEC, changelog, and this runbook aligned.
+3. Add/update per-Agent fixtures and `asv-check`; add XCTest where useful.
+4. Verify new CLI behavior in help, text/JSON output, errors, and Linux builds.
+5. Test deletion only on temporary copies; verify the target is gone and siblings/root/database remain.
+6. Verify export schema/Agent/Full trace, one-file naming, atomic writes, and output-only mutation.
 
-## CLI contract (`asv`)
+Out of scope v1: rewriting Session files; Project/root or CLI bulk delete; live tail; zip/raw export; App Sandbox/App Store; nested subagents; Cursor; cross-Agent search; web UI; Warp protobuf decoding.
 
-Commands must remain discoverable via `asv --help` (overview + examples) and `asv <cmd> --help`.
-
-| Command | Purpose |
-|---------|---------|
-| `list` | Overview (default subcommand) |
-| `projects` | List projects |
-| `sessions [project-id]` | List sessions |
-| `show <session-id>` | Metadata **+ full conversation** (Readable by default; `--full` for full trace) |
-| `export <id>\|--all` | Full-trace JSON into a directory |
-| `delete <session-id>` | Permanently remove one session (`--yes` skips confirm) |
-
-Common flags: `--agent grok-build|claude-code|codex|warp` (default `grok-build`), `--home <path>`, `--json` (list/projects/sessions/show), `--full` (`show`), `--out <dir>` (export), `--yes` (`delete`).
-
-Export = **one JSON file per session**, full event trace, fields at least: `schema_version`, `agent` (`grok-build` / `claude-code` / `codex` / `warp`), session info, `events[]`. Bulk export = directory of files (not zip in v1). One agent per command (no cross-agent list).
-
-Delete = remove that session’s primary artifact under the data root only (Grok directory; Claude/Codex jsonl; Warp conversation rows). Paths outside the data root are refused (file-backed agents).
-
----
-
-## UI contract (app)
-
-Three columns (CC LOG–style, English):
-
-1. **Projects** — cwd groups  
-2. **Sessions** — title, dates, counts  
-3. **Details** — Session info + **Conversation** (every message/event)  
-
-- **Session title:** summary → first user message → short id  
-- **Delete:** toolbar trash (and session context menu) with confirmation; multi-select with ⌘-click / Shift-click range, then delete all selected  
- 
- 
-- **Readable mode** (default): coalesced turns; **Full trace** toolbar toggle: every event  
-- Load via `SessionTranscript.events(for:mode:)` from `updates.jsonl`  
-- **Agent picker** (toolbar): Grok Build | Claude Code | Codex — reloads that agent’s data root only  
-- **One search field only:** “Search all conversations…” — full-text across every session **of the selected agent** (debounced). Results sorted by match count then `updatedAt`; highlight in snippets + detail. Empty query lists all sessions for that agent.
-- Subagent sessions: **flat peers** (no nesting in v1)  
-- Snapshot load / Refresh only — no live file watching in v1  
-
----
-
-## On-disk layouts
-
-### Grok Build
-
-```
-<data-root>/sessions/<percent-encoded-cwd>/<session-id>/
-  summary.json      # metadata / title
-  updates.jsonl     # authoritative conversation + tool stream
-```
-
-- Default: `$GROK_HOME` or `~/.grok`
-- Adapter: `GrokCatalog` / `GrokUpdates`
-
-### Claude Code
-
-```
-<data-root>/projects/<encoded-cwd>/<session-uuid>.jsonl
-```
-
-- Default: `$CLAUDE_CONFIG_DIR` / `$CLAUDE_HOME` or `~/.claude`
-- Prefer JSONL `cwd` over reverse-encoding the folder name
-- Adapter: `ClaudeCatalog` / `ClaudeTranscript`
-- Do not depend on third-party indexes (e.g. `cc-log.sqlite`)
-
-### Codex
-
-```
-<data-root>/sessions/YYYY/MM/DD/rollout-<timestamp>-<session-uuid>.jsonl
-<data-root>/session_index.jsonl   # optional titles
-```
-
-- Default: `$CODEX_HOME` or `~/.codex`
-- Discover by scanning rollouts; use `session_index` for `thread_name` titles when present
-- Group projects by `session_meta.cwd`
-- Adapter: `CodexCatalog` / `CodexTranscript`
-- Do not require SQLite logs for MVP
-
-### Warp
-
-```
-<data-root>/warp.sqlite
-```
-
-- Default: `$WARP_HOME` / `$WARP_DIR`, else macOS group container or Linux `~/.local/state/warp-terminal`
-- Discover `agent_conversations`; user turns from `ai_queries` (`Query.text`)
-- Group projects by `summary.initial_working_directory`
-- Adapter: `WarpCatalog` / `WarpTranscript`
-- Delete = SQL `DELETE` for that `conversation_id` (ADR 0009). Never `rm` `warp.sqlite`.
-- Do not decode `agent_tasks` protobuf in v1
-
-All implement `AgentSessionStore` via `AgentStoreFactory`. 
-
----
-
-## Delivery phases (don’t skip ahead carelessly)
-
-| Phase | Focus |
-|-------|--------|
-| **P0** | Core + `asv` + app shell + fixtures — **done** |
-| **P1** | Detail stream UI + `asv show` conversation — **done** |
-| **P2** | In-app export UI polish |
-| **P3** | Installer **PKG only** — `./scripts/package-dmg.sh` — app → `/Applications`, `asv` → `/usr/local/bin` (no DMG) |
-
-Install product rules (ADR 0006):
-
-- **PKG only** on Releases: installs app + CLI with admin auth — no manual copy, no DMG.
-- CLI remains installable **standalone** if needed.
-- Fallback: `asv` inside the app bundle under `Contents/Resources/bin/`.
-- **App icon:** `Assets/asv-icon-1024.png` → `AppIcon.icns` + `CFBundleIconFile=AppIcon` in the packaged `.app` (required; packaging fails if the asset is missing).
-
----
-
-## When changing behavior
-
-1. Check `docs/adr/` — don’t reverse locked decisions silently.  
-2. Update `docs/SPEC.md` if requirements change.  
-3. Update `CONTEXT.md` only for **domain terms** (glossary), not implementation notes.  
-4. Update this `AGENTS.md` if agent workflow / hard rules change.  
-5. Keep `asv --help` and subcommand help accurate when adding CLI flags/commands.  
-6. Add/adjust fixtures under `Tests/AgentSessionCoreTests/Fixtures/` and cover with `asv-check` when possible.
-
----
-
-## Out of scope (v1)
-
-Rewriting/renaming session files · bulk delete · live tail · zip bulk export · App Sandbox / Mac App Store · nested subagent UI · Cursor adapter · cross-agent search · web frontend
-
----
-
-## Related docs
-
-| File | Role |
-|------|------|
-| [docs/SPEC.md](docs/SPEC.md) | Full product spec |
-| [CONTEXT.md](CONTEXT.md) | Ubiquitous language / glossary |
-| [docs/adr/](docs/adr/) | Why we chose SwiftUI, session-delete exception, export shape, naming, CLI install |
-| [README.md](README.md) | Human install & command cheat sheet |
+Documentation authority: `docs/adr/` (locked decisions) → `docs/SPEC.md` (requirements) → `CONTEXT.md` (terms) → `README.md` (user guide) → `CHANGELOG.md`. If code and docs disagree about current behavior, inspect source/tests and update stale docs; requirement changes still need SPEC/ADR updates.
