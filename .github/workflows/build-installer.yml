@@ -131,13 +131,13 @@ jobs:
           cp .build/release/AgentSessionViewer dist/asv-linux/AgentSessionViewer
           chmod 755 dist/asv-linux/asv dist/asv-linux/AgentSessionViewer
           cat > dist/asv-linux/README.txt <<'EOF'
-Agent Session Viewer for Linux
+          Agent Session Viewer for Linux
 
-  ./AgentSessionViewer --help   terminal session browser
-  ./asv --help                  scriptable CLI
+            ./AgentSessionViewer --help   terminal session browser
+            ./asv --help                  scriptable CLI
 
-The binaries are self-contained except for the system SQLite runtime.
-EOF
+          The binaries are self-contained except for the system SQLite runtime.
+          EOF
           tar -C dist/asv-linux -czf "dist/${{ steps.ver.outputs.asset }}" asv AgentSessionViewer README.txt
           ls -lh "dist/${{ steps.ver.outputs.asset }}"
 
