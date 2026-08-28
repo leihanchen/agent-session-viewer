@@ -25,7 +25,7 @@ struct AgentSessionViewerLinux {
                 agent = .grokBuild
             }
             let store = AgentStoreFactory.make(agent: agent, homeOverride: optionValue("--home", in: args))
-            let sessions = try store.listSessions()
+            let sessions = try store.listSessions(projectId: nil)
             print("Agent: \(agent.displayName) (\(agent.rawValue))")
             print("Data root: \(store.dataRoot.path)")
             print("Projects: \(try store.listProjects().count)  Sessions: \(sessions.count)")
