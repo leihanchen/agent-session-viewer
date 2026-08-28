@@ -1,4 +1,4 @@
-# Build Agent Session Viewer installer (macOS PKG) and Linux asv CLI.
+# Build Agent Session Viewer installers for macOS (PKG) and Linux (tarball).
 #
 # Triggers:
 #   - workflow_dispatch  — manual / remote via `gh workflow run` or Actions UI
@@ -8,7 +8,7 @@
 #
 # Tag releases attach:
 #   - AgentSessionViewer-<version>.pkg  (macOS app + asv)
-#   - asv-<version>-linux-<arch>.tar.gz (CLI only)
+#   - asv-<version>-linux-<arch>.tar.gz (terminal viewer + CLI)
 #
 name: Build installer
 
@@ -115,6 +115,7 @@ jobs:
         run: |
           set -euo pipefail
           swift build -c release --product asv --static-swift-stdlib
+          swift build -c release --product AgentSessionViewer --static-swift-stdlib
           GOT="$(./.build/release/asv --version | tr -d '[:space:]')"
           WANT="${{ steps.ver.outputs.version }}"
           echo "asv --version => $GOT (want $WANT)"
@@ -126,11 +127,20 @@ jobs:
           set -euo pipefail
           mkdir -p dist/asv-linux
           cp .build/release/asv dist/asv-linux/asv
-          chmod 755 dist/asv-linux/asv
-          tar -C dist/asv-linux -czf "dist/${{ steps.ver.outputs.asset }}" asv
+          cp .build/release/AgentSessionViewer dist/asv-linux/AgentSessionViewer
+          chmod 755 dist/asv-linux/asv dist/asv-linux/AgentSessionViewer
+          cat > dist/asv-linux/README.txt <<'EOF'
+Agent Session Viewer for Linux
+
+  ./AgentSessionViewer --help   terminal session browser
+  ./asv --help                  scriptable CLI
+
+The binaries are self-contained except for the system SQLite runtime.
+EOF
+          tar -C dist/asv-linux -czf "dist/${{ steps.ver.outputs.asset }}" asv AgentSessionViewer README.txt
           ls -lh "dist/${{ steps.ver.outputs.asset }}"
 
-      - name: Upload Linux CLI artifact
+      - name: Upload Linux installer bundle
         uses: actions/upload-artifact@v4
         with:
           name: asv-${{ steps.ver.outputs.version }}-linux-${{ steps.ver.outputs.arch }}

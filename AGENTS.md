@@ -4,14 +4,14 @@ Instructions for AI agents working in this repository. Read `docs/adr/` before c
 
 ## Product
 
-**Agent Session Viewer** is a local SwiftUI macOS app with a companion Swift CLI, **`asv`**, for browsing, searching, exporting, and confirmed deletion of coding-agent Sessions.
+**Agent Session Viewer** is a local macOS SwiftUI app plus Linux terminal UI with companion Swift CLI, **`asv`**, for browsing, searching, exporting, and confirmed deletion of coding-agent Sessions.
 
 | Target | Purpose | Platforms |
 |--------|---------|-----------|
 | `AgentSessionCore` | Shared models, stores, parsing, search, export, delete safety | macOS, Linux |
 | `asv` | CLI (ArgumentParser) | macOS, Linux |
 | `asv-check` | Fixture smoke checks | macOS, Linux |
-| `AgentSessionViewer` | SwiftUI app | macOS 14+ |
+| `AgentSessionViewer` | SwiftUI app / Linux terminal UI | macOS 14+ / Linux |
 
 Supported Agents: **Grok Build, Claude Code, Codex, Warp**. English UI only. Browse/search/export require no network. This is not a website, cloud service, or Session editor.
 
@@ -44,7 +44,7 @@ AgentSessionViewer (SwiftUI)       asv (ArgumentParser)
 
 - Swift tools 5.9; macOS deployment target 14.
 - `swift-argument-parser` is CLI-only. Core links `sqlite3` for Warp; Linux builds need `libsqlite3-dev`.
-- `Package.swift` declares the viewer only on macOS. Never import SwiftUI/AppKit in Core or CLI.
+- `Package.swift` selects the SwiftUI viewer on macOS and a dependency-free terminal viewer on Linux. Never import SwiftUI/AppKit in Core or CLI.
 - Flow: `DataRoot.resolve` → `AgentStoreFactory` → normalized models/events → `SessionTranscript`, `ConversationSearch`, `SessionExporter`, or `deleteSession`.
 - Readable mode coalesces text chunks and removes noise; Full trace preserves all normalized Events. Export always uses Full trace, schema version 1.
 - Search is case-insensitive per selected Agent, ranked by matching Event count then recency.
@@ -56,7 +56,8 @@ Sources/AgentSessionCore/
   Search/ Export/
   DataRoot.swift Models.swift SessionTitle.swift SessionTranscript.swift
 Sources/asv/ASV.swift
-Sources/AgentSessionViewer/
+Sources/AgentSessionViewer/       # SwiftUI macOS target
+Sources/AgentSessionViewerLinux/  # terminal Linux target
 Sources/asv-check/main.swift
 Tests/AgentSessionCoreTests/Fixtures/{grok-home,claude-home,codex-home,warp-home}/
 docs/{SPEC.md,adr/}  CONTEXT.md  README.md  CHANGELOG.md
@@ -133,7 +134,7 @@ ASV_VERSION=0.2.0 ./scripts/package-dmg.sh
 
 Version resolution: `ASV_VERSION` → `v*` tag → `VERSION`; `embed-version.sh` updates `Version.swift`. The historically named `package-dmg.sh` must produce **PKG only**: app → `/Applications`, CLI → `/usr/local/bin`, fallback CLI inside the app. Packaging requires `Assets/asv-icon-1024.png`.
 
-CI (`.github/workflows/build-installer.yml`) builds the PKG on `macos-14` and the Linux CLI tarball on Ubuntu; tags attach both to Releases.
+CI (`.github/workflows/build-installer.yml`) builds the macOS PKG and Linux tarball (both `asv` and `AgentSessionViewer`) on Ubuntu; tags attach both to Releases.
 
 ## Change checklist
 

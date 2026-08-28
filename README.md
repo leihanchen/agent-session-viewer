@@ -1,11 +1,11 @@
 # Agent Session Viewer
 
-Local **macOS** browser for coding-agent sessions, with companion CLI **`asv`**. Browse and export without changing agent data; **delete** permanently removes one session after confirmation.
+Local browser for coding-agent sessions, with a macOS SwiftUI viewer, a Linux terminal viewer, and companion CLI **`asv`**. Browse and export without changing agent data; **delete** permanently removes one session after confirmation.
 
 | | |
 |--|--|
 | **Agents** | **Grok Build**, **Claude Code**, **Codex**, and **Warp** (toolbar picker / CLI `--agent`) |
-| **UI** | SwiftUI three-column browser (Projects → Sessions → Conversation) |
+| **UI** | SwiftUI three-column browser on macOS; terminal browser on Linux |
 | **CLI** | `list` / `projects` / `sessions` / `show` / `export` / `delete` |
 
 See [docs/SPEC.md](docs/SPEC.md) (requirements), [AGENTS.md](AGENTS.md) (coding-agent runbook), [CONTEXT.md](CONTEXT.md) (domain glossary), and [docs/adr/](docs/adr/) (decisions).
@@ -30,7 +30,7 @@ See [docs/SPEC.md](docs/SPEC.md) (requirements), [AGENTS.md](AGENTS.md) (coding-
 ## Requirements
 
 - **CLI (`asv`):** macOS 14+ or Linux; Swift 5.9+; Linux needs `libsqlite3-dev`
-- **App:** macOS 14+ / Xcode 15+
+- **App:** macOS 14+ / Xcode 15+ (Linux terminal UI needs no desktop toolkit)
 - Apple Silicon for the published **PKG** installer
 
 ## Build
@@ -52,14 +52,15 @@ asv --help
 
 ### Linux
 
-The **viewer app is macOS-only**. On Linux, `Package.swift` does not include `AgentSessionViewer`.
+Linux uses a dependency-free terminal viewer with the same normalized Core model and store adapters. The richer SwiftUI desktop app remains macOS-only because SwiftUI/AppKit are not available on Linux.
 
-**Prebuilt CLI** (from a tagged [Release](https://github.com/leihanchen/agent-session-viewer/releases)): `asv-<version>-linux-x86_64.tar.gz`. Needs `libsqlite3` on the machine (no Swift toolchain).
+**Prebuilt bundle** (from a tagged [Release](https://github.com/leihanchen/agent-session-viewer/releases)): `asv-<version>-linux-x86_64.tar.gz`. It contains both `asv` and the `AgentSessionViewer` terminal UI; it needs `libsqlite3` on the machine (no Swift toolchain).
 
 ```bash
 tar -xzf asv-*-linux-x86_64.tar.gz
-install -m 755 asv ~/.local/bin/asv   # or sudo install -m 755 asv /usr/local/bin/asv
+install -m 755 asv AgentSessionViewer ~/.local/bin/   # or use /usr/local/bin
 asv --help
+AgentSessionViewer --help
 ```
 
 **Build from source:**
