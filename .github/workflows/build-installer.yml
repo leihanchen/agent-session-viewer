@@ -240,9 +240,9 @@ jobs:
           ./scripts/package-dmg.sh
           # Confirm Info.plist marketing version
           /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
-            "dist/stage/Agent Session Viewer.app/Contents/Info.plist"
+            "dist/stage-build/Agent Session Viewer.app/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' \
-            "dist/stage/Agent Session Viewer.app/Contents/Info.plist"
+            "dist/stage-build/Agent Session Viewer.app/Contents/Info.plist"
           test -f "dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg"
           # Ensure we are not shipping a DMG
           if ls dist/*.dmg >/dev/null 2>&1; then

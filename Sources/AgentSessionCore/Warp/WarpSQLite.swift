@@ -1,5 +1,5 @@
 import Foundation
-import SQLite3
+import CSQLite
 
 enum WarpSQLiteError: Error, LocalizedError, Equatable {
     case openFailed(String)

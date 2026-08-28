@@ -9,8 +9,13 @@ var products: [Product] = [
 ]
 
 var targets: [Target] = [
+    .systemLibrary(
+        name: "CSQLite",
+        path: "Sources/CSQLite"
+    ),
     .target(
         name: "AgentSessionCore",
+        dependencies: ["CSQLite"],
         path: "Sources/AgentSessionCore",
         linkerSettings: [
             .linkedLibrary("sqlite3"),
