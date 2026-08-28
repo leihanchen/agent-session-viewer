@@ -32,7 +32,7 @@ Supported Agents: **Grok Build, Claude Code, Codex, Warp**. English UI only. Bro
 ## Architecture and layout
 
 ```text
-AgentSessionViewer (SwiftUI)       asv (ArgumentParser)
+AgentSessionViewer (SwiftUI macOS / terminal Linux)  asv (ArgumentParser)
               \                    /
                AgentSessionCore
  models · roots · transcripts · search · export · delete safety
