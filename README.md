@@ -50,7 +50,9 @@ cp .build/release/asv /usr/local/bin/asv   # or ~/.local/bin
 asv --help
 ```
 
-### One-line installer
+## Installation
+
+### One-line installer (recommended)
 
 The release installer detects the host platform, verifies a SHA-256 checksum, and installs system-wide. It uses the macOS `.pkg` or Debian/Ubuntu `.deb` and asks for administrator privileges when needed:
 
@@ -59,6 +61,11 @@ curl -fsSL https://raw.githubusercontent.com/leihanchen/agent-session-viewer/mai
 ```
 
 Pin a release with `ASV_VERSION=0.2.0` or `--version 0.2.0` when running a downloaded copy of the script. The script supports macOS and Debian-family Linux; other Linux distributions should use the release artifact manually.
+
+### Manual package installation
+
+- **macOS:** download `AgentSessionViewer-<version>.pkg` from [Releases](https://github.com/leihanchen/agent-session-viewer/releases), open it, and authenticate. It installs the app in `/Applications` and `asv` in `/usr/local/bin`.
+- **Debian/Ubuntu:** download `agent-session-viewer-<version>-linux-amd64.deb`, then run `sudo apt install ./agent-session-viewer-<version>-linux-amd64.deb`. It installs both `AgentSessionViewer` and `asv` in `/usr/bin`.
 
 ### Linux
 
