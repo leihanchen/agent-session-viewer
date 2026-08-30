@@ -155,13 +155,16 @@ jobs:
           EOF
           dpkg-deb --build --root-owner-group "$PKG_ROOT" "dist/${{ steps.ver.outputs.asset }}"
           dpkg-deb --info "dist/${{ steps.ver.outputs.asset }}"
+          (cd dist && sha256sum "${{ steps.ver.outputs.asset }}" > "${{ steps.ver.outputs.asset }}.sha256")
           ls -lh "dist/${{ steps.ver.outputs.asset }}"
 
       - name: Upload Linux Debian installer
         uses: actions/upload-artifact@v4
         with:
           name: agent-session-viewer-${{ steps.ver.outputs.version }}-linux-${{ steps.ver.outputs.deb_arch }}
-          path: dist/${{ steps.ver.outputs.asset }}
+          path: |
+            dist/${{ steps.ver.outputs.asset }}
+            dist/${{ steps.ver.outputs.asset }}.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -169,7 +172,9 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/${{ steps.ver.outputs.asset }}
+          files: |
+            dist/${{ steps.ver.outputs.asset }}
+            dist/${{ steps.ver.outputs.asset }}.sha256
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -266,6 +271,7 @@ jobs:
             ls -la dist/*.dmg
             exit 1
           fi
+          (cd dist && shasum -a 256 "AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg" > "AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg.sha256")
 
       - name: List artifacts
         run: |
@@ -279,6 +285,7 @@ jobs:
           path: |
             dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg
             dist/AgentSessionViewer.pkg
+            dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -288,6 +295,7 @@ jobs:
         with:
           files: |
             dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg
+            dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg.sha256
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

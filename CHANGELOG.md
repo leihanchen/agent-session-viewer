@@ -6,6 +6,8 @@ All notable changes to **Agent Session Viewer** are documented here.
 
 ### Added
 
+- Verified one-line system-wide installer at `scripts/install.sh` for macOS PKG and Debian/Ubuntu DEB releases
+- SHA-256 checksum assets for release installers
 - **Linux terminal UI and `asv` CLI** (Core + `AgentSessionViewer` + `asv` + `asv-check`; SwiftUI desktop viewer remains macOS-only)
 - CI publishes **`agent-session-viewer-<version>-linux-<arch>.deb`** next to the macOS `.pkg` on tag Releases
 - **Session delete** in the viewer (toolbar trash + confirmation) and CLI (`asv delete <session-id> [--yes]`)

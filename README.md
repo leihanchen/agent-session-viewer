@@ -50,6 +50,16 @@ cp .build/release/asv /usr/local/bin/asv   # or ~/.local/bin
 asv --help
 ```
 
+### One-line installer
+
+The release installer detects the host platform, verifies a SHA-256 checksum, and installs system-wide. It uses the macOS `.pkg` or Debian/Ubuntu `.deb` and asks for administrator privileges when needed:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/leihanchen/agent-session-viewer/main/scripts/install.sh | bash
+```
+
+Pin a release with `ASV_VERSION=0.2.0` or `--version 0.2.0` when running a downloaded copy of the script. The script supports macOS and Debian-family Linux; other Linux distributions should use the release artifact manually.
+
 ### Linux
 
 Linux uses a dependency-free terminal viewer with the same normalized Core model and store adapters. The richer SwiftUI desktop app remains macOS-only because SwiftUI/AppKit are not available on Linux.

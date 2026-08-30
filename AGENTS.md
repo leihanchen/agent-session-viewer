@@ -56,6 +56,7 @@ Sources/AgentSessionCore/
   Search/ Export/
   DataRoot.swift Models.swift SessionTitle.swift SessionTranscript.swift
 Sources/asv/ASV.swift
+scripts/install.sh              # verified system-wide release installer
 Sources/AgentSessionViewer/       # SwiftUI macOS target
 Sources/AgentSessionViewerLinux/  # terminal Linux target
 Sources/asv-check/main.swift
