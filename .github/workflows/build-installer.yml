@@ -1,4 +1,4 @@
-# Build Agent Session Viewer installer (macOS PKG) and Linux asv CLI.
+# Build Agent Session Viewer installers for macOS (PKG) and Debian-family Linux (DEB).
 #
 # Triggers:
 #   - workflow_dispatch  — manual / remote via `gh workflow run` or Actions UI
@@ -8,7 +8,7 @@
 #
 # Tag releases attach:
 #   - AgentSessionViewer-<version>.pkg  (macOS app + asv)
-#   - asv-<version>-linux-<arch>.tar.gz (CLI only)
+#   - agent-session-viewer-<version>-linux-<arch>.deb (terminal viewer + CLI)
 #
 name: Build installer
 
@@ -34,6 +34,7 @@ on:
       - "v*"
     branches:
       - main
+      - "codex/**"
     paths:
       - "Sources/**"
       - "Package.swift"
@@ -61,7 +62,7 @@ permissions:
 
 jobs:
   linux-cli:
-    name: Linux asv
+    name: Linux Debian installer
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -90,7 +91,13 @@ jobs:
           ARCH="$(uname -m)"
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "arch=$ARCH" >> "$GITHUB_OUTPUT"
-          echo "asset=asv-${V}-linux-${ARCH}.tar.gz" >> "$GITHUB_OUTPUT"
+          case "$ARCH" in
+            x86_64) DEB_ARCH=amd64 ;;
+            aarch64|arm64) DEB_ARCH=arm64 ;;
+            *) echo "Unsupported Linux architecture: $ARCH" >&2; exit 1 ;;
+          esac
+          echo "deb_arch=$DEB_ARCH" >> "$GITHUB_OUTPUT"
+          echo "asset=agent-session-viewer-${V}-linux-${DEB_ARCH}.deb" >> "$GITHUB_OUTPUT"
           echo "Using ASV_VERSION=$V arch=$ARCH"
 
       - name: Install Swift
@@ -115,34 +122,59 @@ jobs:
         run: |
           set -euo pipefail
           swift build -c release --product asv --static-swift-stdlib
+          swift build -c release --product AgentSessionViewer --static-swift-stdlib
           GOT="$(./.build/release/asv --version | tr -d '[:space:]')"
           WANT="${{ steps.ver.outputs.version }}"
           echo "asv --version => $GOT (want $WANT)"
           echo "$GOT" | grep -q "$WANT"
           file .build/release/asv
 
-      - name: Package tarball
+      - name: Package Debian installer
         run: |
           set -euo pipefail
-          mkdir -p dist/asv-linux
-          cp .build/release/asv dist/asv-linux/asv
-          chmod 755 dist/asv-linux/asv
-          tar -C dist/asv-linux -czf "dist/${{ steps.ver.outputs.asset }}" asv
+          PKG_ROOT="dist/deb-root"
+          mkdir -p "$PKG_ROOT/DEBIAN" "$PKG_ROOT/usr/bin" "$PKG_ROOT/usr/share/doc/agent-session-viewer"
+          cp .build/release/asv "$PKG_ROOT/usr/bin/asv"
+          cp .build/release/AgentSessionViewer "$PKG_ROOT/usr/bin/AgentSessionViewer"
+          chmod 755 "$PKG_ROOT/usr/bin/asv" "$PKG_ROOT/usr/bin/AgentSessionViewer"
+          cat > "$PKG_ROOT/DEBIAN/control" <<EOF
+          Package: agent-session-viewer
+          Version: ${{ steps.ver.outputs.version }}
+          Section: devel
+          Priority: optional
+          Architecture: ${{ steps.ver.outputs.deb_arch }}
+          Maintainer: Agent Session Viewer maintainers
+          Depends: libc6, libsqlite3-0
+          Description: Local coding-agent session viewer and CLI
+           Includes the AgentSessionViewer terminal UI and the asv command-line tool.
+          EOF
+          cat > "$PKG_ROOT/usr/share/doc/agent-session-viewer/README" <<'EOF'
+          Agent Session Viewer for Linux
+
+          Run AgentSessionViewer for the terminal UI or asv for the scriptable CLI.
+          EOF
+          dpkg-deb --build --root-owner-group "$PKG_ROOT" "dist/${{ steps.ver.outputs.asset }}"
+          dpkg-deb --info "dist/${{ steps.ver.outputs.asset }}"
+          (cd dist && sha256sum "${{ steps.ver.outputs.asset }}" > "${{ steps.ver.outputs.asset }}.sha256")
           ls -lh "dist/${{ steps.ver.outputs.asset }}"
 
-      - name: Upload Linux CLI artifact
+      - name: Upload Linux Debian installer
         uses: actions/upload-artifact@v4
         with:
-          name: asv-${{ steps.ver.outputs.version }}-linux-${{ steps.ver.outputs.arch }}
-          path: dist/${{ steps.ver.outputs.asset }}
+          name: agent-session-viewer-${{ steps.ver.outputs.version }}-linux-${{ steps.ver.outputs.deb_arch }}
+          path: |
+            dist/${{ steps.ver.outputs.asset }}
+            dist/${{ steps.ver.outputs.asset }}.sha256
           if-no-files-found: error
           retention-days: 30
 
-      - name: Attach Linux CLI to GitHub Release (tags only)
+      - name: Attach Linux installer to GitHub Release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/${{ steps.ver.outputs.asset }}
+          files: |
+            dist/${{ steps.ver.outputs.asset }}
+            dist/${{ steps.ver.outputs.asset }}.sha256
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -229,9 +261,9 @@ jobs:
           ./scripts/package-dmg.sh
           # Confirm Info.plist marketing version
           /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
-            "dist/stage/Agent Session Viewer.app/Contents/Info.plist"
+            "dist/stage-build/Agent Session Viewer.app/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' \
-            "dist/stage/Agent Session Viewer.app/Contents/Info.plist"
+            "dist/stage-build/Agent Session Viewer.app/Contents/Info.plist"
           test -f "dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg"
           # Ensure we are not shipping a DMG
           if ls dist/*.dmg >/dev/null 2>&1; then
@@ -239,6 +271,7 @@ jobs:
             ls -la dist/*.dmg
             exit 1
           fi
+          (cd dist && shasum -a 256 "AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg" > "AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg.sha256")
 
       - name: List artifacts
         run: |
@@ -252,6 +285,7 @@ jobs:
           path: |
             dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg
             dist/AgentSessionViewer.pkg
+            dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -261,6 +295,7 @@ jobs:
         with:
           files: |
             dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg
+            dist/AgentSessionViewer-${{ steps.ver.outputs.version }}.pkg.sha256
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

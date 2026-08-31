@@ -9,8 +9,13 @@ var products: [Product] = [
 ]
 
 var targets: [Target] = [
+    .systemLibrary(
+        name: "CSQLite",
+        path: "Sources/CSQLite"
+    ),
     .target(
         name: "AgentSessionCore",
+        dependencies: ["CSQLite"],
         path: "Sources/AgentSessionCore",
         linkerSettings: [
             .linkedLibrary("sqlite3"),
@@ -52,6 +57,19 @@ targets.append(
             "AgentSessionCore",
         ],
         path: "Sources/AgentSessionViewer"
+    )
+)
+#else
+// Linux has no SwiftUI/AppKit runtime. Keep the same product name and expose
+// a lightweight terminal viewer backed by the identical AgentSessionCore API.
+products.append(
+    .executable(name: "AgentSessionViewer", targets: ["AgentSessionViewerLinux"])
+)
+targets.append(
+    .executableTarget(
+        name: "AgentSessionViewerLinux",
+        dependencies: ["AgentSessionCore"],
+        path: "Sources/AgentSessionViewerLinux"
     )
 )
 #endif

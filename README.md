@@ -1,11 +1,11 @@
 # Agent Session Viewer
 
-Local **macOS** browser for coding-agent sessions, with companion CLI **`asv`**. Browse and export without changing agent data; **delete** permanently removes one session after confirmation.
+Local browser for coding-agent sessions, with a macOS SwiftUI viewer, a Linux terminal viewer, and companion CLI **`asv`**. Browse and export without changing agent data; **delete** permanently removes one session after confirmation.
 
 | | |
 |--|--|
 | **Agents** | **Grok Build**, **Claude Code**, **Codex**, and **Warp** (toolbar picker / CLI `--agent`) |
-| **UI** | SwiftUI three-column browser (Projects → Sessions → Conversation) |
+| **UI** | SwiftUI three-column browser on macOS; terminal browser on Linux |
 | **CLI** | `list` / `projects` / `sessions` / `show` / `export` / `delete` |
 
 See [docs/SPEC.md](docs/SPEC.md) (requirements), [AGENTS.md](AGENTS.md) (coding-agent runbook), [CONTEXT.md](CONTEXT.md) (domain glossary), and [docs/adr/](docs/adr/) (decisions).
@@ -30,7 +30,7 @@ See [docs/SPEC.md](docs/SPEC.md) (requirements), [AGENTS.md](AGENTS.md) (coding-
 ## Requirements
 
 - **CLI (`asv`):** macOS 14+ or Linux; Swift 5.9+; Linux needs `libsqlite3-dev`
-- **App:** macOS 14+ / Xcode 15+
+- **App:** macOS 14+ / Xcode 15+ (Linux terminal UI needs no desktop toolkit)
 - Apple Silicon for the published **PKG** installer
 
 ## Build
@@ -50,16 +50,33 @@ cp .build/release/asv /usr/local/bin/asv   # or ~/.local/bin
 asv --help
 ```
 
-### Linux
+## Installation
 
-The **viewer app is macOS-only**. On Linux, `Package.swift` does not include `AgentSessionViewer`.
+### One-line installer (recommended)
 
-**Prebuilt CLI** (from a tagged [Release](https://github.com/leihanchen/agent-session-viewer/releases)): `asv-<version>-linux-x86_64.tar.gz`. Needs `libsqlite3` on the machine (no Swift toolchain).
+The release installer detects the host platform, verifies a SHA-256 checksum, and installs system-wide. It uses the macOS `.pkg` or Debian/Ubuntu `.deb` and asks for administrator privileges when needed:
 
 ```bash
-tar -xzf asv-*-linux-x86_64.tar.gz
-install -m 755 asv ~/.local/bin/asv   # or sudo install -m 755 asv /usr/local/bin/asv
+curl -fsSL https://raw.githubusercontent.com/leihanchen/agent-session-viewer/main/scripts/install.sh | bash
+```
+
+Pin a release with `ASV_VERSION=0.2.0` or `--version 0.2.0` when running a downloaded copy of the script. The script supports macOS and Debian-family Linux; other Linux distributions should use the release artifact manually.
+
+### Manual package installation
+
+- **macOS:** download `AgentSessionViewer-<version>.pkg` from [Releases](https://github.com/leihanchen/agent-session-viewer/releases), open it, and authenticate. It installs the app in `/Applications` and `asv` in `/usr/local/bin`.
+- **Debian/Ubuntu:** download `agent-session-viewer-<version>-linux-amd64.deb`, then run `sudo apt install ./agent-session-viewer-<version>-linux-amd64.deb`. It installs both `AgentSessionViewer` and `asv` in `/usr/bin`.
+
+### Linux
+
+Linux uses a dependency-free terminal viewer with the same normalized Core model and store adapters. The richer SwiftUI desktop app remains macOS-only because SwiftUI/AppKit are not available on Linux.
+
+**Prebuilt Debian installer** (from a tagged [Release](https://github.com/leihanchen/agent-session-viewer/releases)): `agent-session-viewer-<version>-linux-amd64.deb`. It installs both `asv` and the `AgentSessionViewer` terminal UI; `libsqlite3-0` is installed as a package dependency.
+
+```bash
+sudo apt install ./agent-session-viewer-*-linux-amd64.deb
 asv --help
+AgentSessionViewer --help
 ```
 
 **Build from source:**
@@ -186,9 +203,9 @@ Outputs:
 | Installer package | `dist/AgentSessionViewer-<version>.pkg` |
 | Stable pkg name | `dist/AgentSessionViewer.pkg` |
 | Staged app | `dist/stage-build/Agent Session Viewer.app` |
-| Linux CLI (CI) | `asv-<version>-linux-x86_64.tar.gz` on the workflow run / Release |
+| Linux installer (CI) | `agent-session-viewer-<version>-linux-amd64.deb` on the workflow run / Release |
 
-**User flow:** download **AgentSessionViewer-0.2.0.pkg** (or latest) from [Releases](https://github.com/leihanchen/agent-session-viewer/releases) → double-click → authenticate → open the app from Applications and run `asv --help` in Terminal. Linux users download **`asv-*-linux-x86_64.tar.gz`** from the same Release.
+**User flow:** download **AgentSessionViewer-0.2.0.pkg** (or latest) from [Releases](https://github.com/leihanchen/agent-session-viewer/releases) → double-click → authenticate → open the app from Applications and run `asv --help` in Terminal. Debian-family Linux users download **`agent-session-viewer-*-linux-amd64.deb`** and install it with `apt`.
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
@@ -213,7 +230,7 @@ Workflow: [`.github/workflows/build-installer.yml`](.github/workflows/build-inst
 | **Tag** | `git tag v0.2.0 && git push origin v0.2.0` (uploads release assets) |
 | **Push to `main`** | When `Sources/`, `scripts/`, or packaging paths change |
 
-Artifacts (`.pkg` and Linux `asv-*-linux-*.tar.gz`) appear under the workflow run → **Artifacts**, and on tag Releases.
+Artifacts (`.pkg` and Linux `agent-session-viewer-*-linux-*.deb`) appear under the workflow run → **Artifacts**, and on tag Releases.
 
 ```bash
 # Trigger from anywhere with gh authenticated
